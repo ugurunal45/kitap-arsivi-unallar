@@ -28,7 +28,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const kitapRef = collection(db, "kitaplar");
+    const kitapRef = collection(db, "kitap-arsivi");
 
     // Kitap ekleme
     window.kitapEkle = async function () {
