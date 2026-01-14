@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Kitap Arşivi</title>
 
-  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import {
@@ -30,45 +29,71 @@
     const db = getFirestore(app);
     const kitapRef = collection(db, "kitap-arsivi");
 
-    // Kitap ekleme
+    let tumKitaplar = [];
+
+    // Tekli ekleme
     window.kitapEkle = async function () {
-      const kitapAdi = document.getElementById("kitapAdi").value.trim();
+      const ad = document.getElementById("tekKitap").value.trim();
+      if (!ad) return alert("Kitap adı boş olamaz");
 
-      if (!kitapAdi) {
-        alert("Kitap adı boş olamaz");
-        return;
-      }
-
-      await addDoc(kitapRef, {
-        ad: kitapAdi,
-        tarih: serverTimestamp()
-      });
-
-      document.getElementById("kitapAdi").value = "";
+      await addDoc(kitapRef, { ad, tarih: serverTimestamp() });
+      document.getElementById("tekKitap").value = "";
       kitaplariGetir();
     };
 
-    // Kitapları listele
+    // Çoklu ekleme
+    window.cokluEkle = async function () {
+      const alan = document.getElementById("cokluAlan");
+      const satirlar = alan.value.split("\n").map(s => s.trim()).filter(s => s);
+
+      if (satirlar.length === 0) {
+        alert("Eklenecek kitap yok");
+        return;
+      }
+
+      for (const kitap of satirlar) {
+        await addDoc(kitapRef, { ad: kitap, tarih: serverTimestamp() });
+      }
+
+      alan.value = "";
+      kitaplariGetir();
+      alert(satirlar.length + " kitap eklendi");
+    };
+
+    // Listeleme
     async function kitaplariGetir() {
       const liste = document.getElementById("kitapListesi");
-      const sayac = document.getElementById("kitapSayisi");
+      const sayac = document.getElementById("sayac");
 
       liste.innerHTML = "";
+      tumKitaplar = [];
 
       const q = query(kitapRef, orderBy("ad"));
-      const snapshot = await getDocs(q);
+      const snap = await getDocs(q);
 
-      let toplam = 0;
+      snap.forEach(doc => tumKitaplar.push(doc.data().ad));
 
-      snapshot.forEach(doc => {
-        toplam++;
+      sayac.textContent = "Toplam Kitap: " + tumKitaplar.length;
+      listele(tumKitaplar);
+    }
+
+    function listele(dizi) {
+      const liste = document.getElementById("kitapListesi");
+      liste.innerHTML = "";
+
+      dizi.forEach(ad => {
         const li = document.createElement("li");
-        li.textContent = doc.data().ad;
+        li.textContent = ad;
         liste.appendChild(li);
       });
-
-      sayac.textContent = `Toplam Kitap: ${toplam}`;
     }
+
+    // Arama
+    window.ara = function () {
+      const q = document.getElementById("arama").value.toLowerCase();
+      const filtre = tumKitaplar.filter(k => k.toLowerCase().includes(q));
+      listele(filtre);
+    };
 
     window.onload = kitaplariGetir;
   </script>
@@ -76,87 +101,66 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f4f6f8;
+      background: #f2f4f7;
       margin: 0;
       padding: 0;
     }
-
-    .container {
-      max-width: 700px;
-      margin: 40px auto;
-      background: white;
-      padding: 25px;
+    .box {
+      max-width: 800px;
+      margin: 30px auto;
+      background: #fff;
+      padding: 20px;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 5px 12px rgba(0,0,0,.1);
     }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 5px;
-    }
-
-    .sayac {
-      text-align: center;
-      font-weight: bold;
-      margin-bottom: 20px;
-      color: #333;
-    }
-
-    .ekle {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    input {
-      flex: 1;
+    h1 { text-align: center; }
+    input, textarea, button {
+      width: 100%;
+      margin: 6px 0;
       padding: 10px;
-      font-size: 16px;
+      font-size: 15px;
     }
-
     button {
-      padding: 10px 16px;
-      font-size: 16px;
-      cursor: pointer;
       background: #007bff;
-      color: white;
+      color: #fff;
       border: none;
+      cursor: pointer;
       border-radius: 5px;
     }
-
-    button:hover {
-      background: #0056b3;
-    }
-
+    button:hover { background: #0056b3; }
     ul {
       list-style: none;
       padding: 0;
-      margin: 0;
       max-height: 400px;
       overflow-y: auto;
-      border-top: 1px solid #ddd;
     }
-
     li {
-      padding: 8px 6px;
+      padding: 6px;
       border-bottom: 1px solid #eee;
     }
-
-    li:nth-child(odd) {
-      background: #fafafa;
+    .sayac {
+      text-align: center;
+      font-weight: bold;
+      margin: 10px 0;
     }
   </style>
 </head>
 
 <body>
-  <div class="container">
+  <div class="box">
     <h1>📚 Kitap Arşivi</h1>
-    <div id="kitapSayisi" class="sayac">Toplam Kitap: 0</div>
 
-    <div class="ekle">
-      <input id="kitapAdi" placeholder="Sadece kitap adı yaz" />
-      <button onclick="kitapEkle()">Ekle</button>
-    </div>
+    <div class="sayac" id="sayac">Toplam Kitap: 0</div>
+
+    <input id="arama" placeholder="Kitap ara..." onkeyup="ara()">
+
+    <h3>➕ Tek Kitap Ekle</h3>
+    <input id="tekKitap" placeholder="Kitap adı">
+    <button onclick="kitapEkle()">Ekle</button>
+
+    <h3>📦 Çoklu Kitap Ekle (her satır 1 kitap)</h3>
+    <textarea id="cokluAlan" rows="6" placeholder="Kitap 1&#10;Kitap 2&#10;Kitap 3"></textarea>
+    <button onclick="cokluEkle()">Toplu Ekle</button>
 
     <ul id="kitapListesi"></ul>
   </div>
