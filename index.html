@@ -1,12 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Kitap Arşivi Giriş</title>
+  <title>Kitap Arşivi – Giriş</title>
 </head>
 <body>
-  <h1>Giriş Sayfası</h1>
-  <p>Kitap arşivi yakında burada.</p>
+
+  <h2>Kitap Arşivi Giriş</h2>
+
+  <input type="text" id="username" placeholder="Kullanıcı adı"><br><br>
+  <input type="password" id="password" placeholder="Şifre"><br><br>
+
+  <button onclick="login()">Giriş Yap</button>
+
+  <p id="error" style="color:red;"></p>
+
+  <script>
+    function login() {
+      const user = document.getElementById("username").value;
+      const pass = document.getElementById("password").value;
+
+      if (user === "ugur" && pass === "1234") {
+        window.location.href = "arsiv.html";
+      } else {
+        document.getElementById("error").innerText = "Hatalı kullanıcı adı veya şifre";
+      }
+    }
+  </script>
+
 </body>
 </html>
-
