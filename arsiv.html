@@ -1,45 +1,96 @@
-<script>
-  const DATA_URL = "https://raw.githubusercontent.com/ugurunal45/kitap-arsivi-unallar/main/data.json";
-
-  let kitaplar = [];
-
-  async function verileriYukle() {
-    try {
-      const response = await fetch(DATA_URL);
-      const data = await response.json();
-
-      kitaplar = data.kitaplar || [];
-      listeyiGuncelle();
-    } catch (e) {
-      document.body.innerHTML = "<h2>Veri yükleme hatası</h2><pre>" + e + "</pre>";
-      console.error(e);
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kitap Arşivi</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
     }
-  }
 
-  function listeyiGuncelle() {
-    const ul = document.getElementById("kitapListesi");
-    ul.innerHTML = "";
+    input {
+      padding: 8px;
+      width: 70%;
+    }
 
-    kitaplar.forEach(k => {
-      const li = document.createElement("li");
-      li.textContent = `${k.ad} — ${k.yazar} (ISBN: ${k.isbn})`;
-      ul.appendChild(li);
+    button {
+      padding: 8px;
+      margin-left: 5px;
+    }
+
+    ul {
+      margin-top: 20px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>📚 Kitap Arşivi</h2>
+
+  <input type="text" id="arama" placeholder="Kitap adı veya yazar ara">
+  <button onclick="aramaYap()">Ara</button>
+
+  <!-- 🔴 EKSİK OLAN ELEMAN BURASIYDI -->
+  <ul id="kitapListesi"></ul>
+
+  <script>
+    let tumKitaplar = [];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      fetch("https://raw.githubusercontent.com/ugurunal45/kitap-arsivi-unallar/main/data.json")
+        .then(res => {
+          if (!res.ok) {
+            throw new Error("Veri alınamadı");
+          }
+          return res.json();
+        })
+        .then(data => {
+          tumKitaplar = data.kitaplar;
+          listeyiGoster(tumKitaplar);
+        })
+        .catch(err => {
+          document.getElementById("kitapListesi").innerHTML =
+            "<li>❌ Veriler yüklenemedi</li>";
+          console.error(err);
+        });
     });
-  }
 
-  function aramaYap() {
-    const aranan = document.getElementById("arama").value.toLowerCase();
-    const ul = document.getElementById("kitapListesi");
-    ul.innerHTML = "";
+    function listeyiGoster(liste) {
+      const ul = document.getElementById("kitapListesi");
+      ul.innerHTML = "";
 
-    kitaplar
-      .filter(k => k.ad.toLowerCase().includes(aranan))
-      .forEach(k => {
+      if (liste.length === 0) {
+        ul.innerHTML = "<li>Sonuç bulunamadı</li>";
+        return;
+      }
+
+      liste.forEach(k => {
         const li = document.createElement("li");
         li.textContent = `${k.ad} — ${k.yazar} (ISBN: ${k.isbn})`;
         ul.appendChild(li);
       });
-  }
+    }
 
-  verileriYukle();
-</script>
+    function aramaYap() {
+      const q = document.getElementById("arama").value.toLowerCase();
+
+      const filtreli = tumKitaplar.filter(k =>
+        k.ad.toLowerCase().includes(q) ||
+        k.yazar.toLowerCase().includes(q) ||
+        k.isbn.includes(q)
+      );
+
+      listeyiGoster(filtreli);
+    }
+  </script>
+
+</body>
+</html>
