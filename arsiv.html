@@ -36,6 +36,30 @@
       justify-content: space-between;
       align-items: center;
     }
+
+    #adminPanel {
+      display: none;
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ccc;
+    }
+
+    /* 📱 Mobil uyum */
+    @media (max-width: 600px) {
+      body {
+        margin: 20px;
+      }
+
+      input, button {
+        width: 100%;
+        margin: 5px 0;
+      }
+
+      .ust {
+        flex-direction: column;
+        gap: 10px;
+      }
+    }
   </style>
 </head>
 
@@ -44,6 +68,18 @@
   <div class="ust">
     <h2>📚 Kitap Arşivi</h2>
     <button onclick="cikisYap()">Çıkış</button>
+  </div>
+
+  <!-- 🔐 ADMIN PANEL -->
+  <div id="adminPanel">
+    <h3>➕ Kitap Ekle (Sadece Admin)</h3>
+
+    <input type="text" id="yeniAd" placeholder="Kitap Adı">
+    <input type="text" id="yeniYazar" placeholder="Yazar">
+    <input type="text" id="yeniIsbn" placeholder="ISBN">
+
+    <button onclick="kitapEkle()">Ekle</button>
+    <p id="ekleMesaj"></p>
   </div>
 
   <input type="text" id="arama" placeholder="Kitap adı, yazar veya ISBN ara">
@@ -69,14 +105,22 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
 
+    /* 👤 ADMIN TANIMI */
+    const ADMIN_EMAIL = "admin@unallar.com";
+
     /* 🔒 GİRİŞ KONTROLÜ */
     auth.onAuthStateChanged(user => {
       if (!user) {
         window.location.href = "login.html";
+        return;
+      }
+
+      if (user.email === ADMIN_EMAIL) {
+        document.getElementById("adminPanel").style.display = "block";
       }
     });
 
-    /* 📚 KİTAP VERİLERİ */
+    /* 📚 KİTAPLAR */
     let tumKitaplar = [];
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -123,6 +167,25 @@
       listeyiGoster(filtreli);
     }
 
+    /* ➕ ADMIN KİTAP EKLEME (GEÇİCİ) */
+    function kitapEkle() {
+      const ad = document.getElementById("yeniAd").value;
+      const yazar = document.getElementById("yeniYazar").value;
+      const isbn = document.getElementById("yeniIsbn").value;
+
+      if (!ad || !yazar || !isbn) {
+        document.getElementById("ekleMesaj").innerText = "❌ Tüm alanları doldur";
+        return;
+      }
+
+      tumKitaplar.push({ ad, yazar, isbn });
+      listeyiGoster(tumKitaplar);
+
+      document.getElementById("ekleMesaj").innerText =
+        "✅ Kitap eklendi (sayfa yenilenirse silinir)";
+    }
+
+    /* 🚪 ÇIKIŞ */
     function cikisYap() {
       auth.signOut().then(() => {
         window.location.href = "login.html";
