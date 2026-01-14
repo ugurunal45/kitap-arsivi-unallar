@@ -18,15 +18,6 @@
       margin-bottom: 20px;
     }
 
-    h1 {
-      margin: 0;
-    }
-
-    button {
-      padding: 6px 12px;
-      cursor: pointer;
-    }
-
     .box {
       border: 1px solid #ccc;
       padding: 15px;
@@ -34,10 +25,14 @@
     }
 
     input {
-      display: block;
       width: 100%;
       padding: 8px;
       margin-bottom: 10px;
+    }
+
+    button {
+      padding: 6px 12px;
+      cursor: pointer;
     }
 
     ul {
@@ -65,28 +60,24 @@
 <div id="adminPanel" class="box hidden">
   <h3>➕ Kitap Ekle (Sadece Admin)</h3>
   <input id="kitapAdi" placeholder="Kitap Adı">
-  <input id="yazar" placeholder="Yazar">
-  <input id="isbn" placeholder="ISBN">
   <button id="ekleBtn">Ekle</button>
 </div>
 
 <!-- ARAMA -->
 <div class="box">
-  <input id="aramaInput" placeholder="Kitap adı, yazar veya ISBN ara">
+  <input id="aramaInput" placeholder="Kitap adına göre ara">
   <button id="araBtn">Ara</button>
 </div>
 
 <!-- LİSTE -->
 <ul id="kitapListesi"></ul>
 
-<!-- FIREBASE -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  /* 🔧 ADMIN EMAIL */
-  const ADMIN_EMAIL = "admin@unallar.com";
+  const ADMIN_EMAIL = "seninadminmailin@gmail.com";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
@@ -106,7 +97,7 @@
 
   let tumKitaplar = [];
 
-  // AUTH KONTROL
+  // GİRİŞ KONTROL
   onAuthStateChanged(auth, (user) => {
     if (!user) {
       window.location.href = "index.html";
@@ -143,12 +134,12 @@
     kitapListesi.innerHTML = "";
     liste.forEach(k => {
       const li = document.createElement("li");
-      li.textContent = `${k.ad} — ${k.yazar} (ISBN: ${k.isbn})`;
+      li.textContent = k.ad;
       kitapListesi.appendChild(li);
     });
   }
 
-  // KİTAP EKLE (SADECE ADMIN)
+  // KİTAP EKLE (SADECE AD)
   document.getElementById("ekleBtn").onclick = async () => {
     const user = auth.currentUser;
     if (!user || user.email !== ADMIN_EMAIL) {
@@ -157,16 +148,13 @@
     }
 
     const ad = kitapAdi.value.trim();
-    const yazar = document.getElementById("yazar").value.trim();
-    const isbn = document.getElementById("isbn").value.trim();
-
-    if (!ad || !yazar || !isbn) {
-      alert("Tüm alanları doldur");
+    if (!ad) {
+      alert("Kitap adı boş olamaz");
       return;
     }
 
-    await addDoc(collection(db, "kitaplar"), { ad, yazar, isbn });
-    kitapAdi.value = yazar.value = isbn.value = "";
+    await addDoc(collection(db, "kitaplar"), { ad });
+    kitapAdi.value = "";
     kitaplariYukle();
   };
 
@@ -174,9 +162,7 @@
   document.getElementById("araBtn").onclick = () => {
     const q = aramaInput.value.toLowerCase();
     const filtre = tumKitaplar.filter(k =>
-      k.ad.toLowerCase().includes(q) ||
-      k.yazar.toLowerCase().includes(q) ||
-      k.isbn.includes(q)
+      k.ad.toLowerCase().includes(q)
     );
     listele(filtre);
   };
