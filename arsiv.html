@@ -3,195 +3,184 @@
 <head>
   <meta charset="UTF-8">
   <title>Kitap Arşivi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
+      margin: 20px;
     }
 
-    input {
-      padding: 8px;
-      width: 70%;
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
     }
 
     button {
-      padding: 8px;
-      margin-left: 5px;
+      padding: 6px 12px;
       cursor: pointer;
     }
 
+    .box {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+
     ul {
-      margin-top: 20px;
       padding-left: 20px;
     }
 
     li {
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
-    .ust {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    #adminPanel {
+    .hidden {
       display: none;
-      margin: 20px 0;
-      padding: 15px;
-      border: 1px solid #ccc;
-    }
-
-    /* 📱 Mobil uyum */
-    @media (max-width: 600px) {
-      body {
-        margin: 20px;
-      }
-
-      input, button {
-        width: 100%;
-        margin: 5px 0;
-      }
-
-      .ust {
-        flex-direction: column;
-        gap: 10px;
-      }
     }
   </style>
 </head>
 
 <body>
 
-  <div class="ust">
-    <h2>📚 Kitap Arşivi</h2>
-    <button onclick="cikisYap()">Çıkış</button>
-  </div>
+<header>
+  <h1>📚 Kitap Arşivi</h1>
+  <button id="logoutBtn">Çıkış</button>
+</header>
 
-  <!-- 🔐 ADMIN PANEL -->
-  <div id="adminPanel">
-    <h3>➕ Kitap Ekle (Sadece Admin)</h3>
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="box hidden">
+  <h3>➕ Kitap Ekle (Sadece Admin)</h3>
+  <input id="kitapAdi" placeholder="Kitap Adı">
+  <input id="yazar" placeholder="Yazar">
+  <input id="isbn" placeholder="ISBN">
+  <button id="ekleBtn">Ekle</button>
+</div>
 
-    <input type="text" id="yeniAd" placeholder="Kitap Adı">
-    <input type="text" id="yeniYazar" placeholder="Yazar">
-    <input type="text" id="yeniIsbn" placeholder="ISBN">
+<!-- ARAMA -->
+<div class="box">
+  <input id="aramaInput" placeholder="Kitap adı, yazar veya ISBN ara">
+  <button id="araBtn">Ara</button>
+</div>
 
-    <button onclick="kitapEkle()">Ekle</button>
-    <p id="ekleMesaj"></p>
-  </div>
+<!-- LİSTE -->
+<ul id="kitapListesi"></ul>
 
-  <input type="text" id="arama" placeholder="Kitap adı, yazar veya ISBN ara">
-  <button onclick="aramaYap()">Ara</button>
+<!-- FIREBASE -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  <ul id="kitapListesi"></ul>
+  /* 🔧 ADMIN EMAIL */
+  const ADMIN_EMAIL = "admin@unallar.com";
 
-  <!-- 🔐 Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
+    authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
+    projectId: "kitap-arsivi-8efa5",
+    storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
+    messagingSenderId: "712225906954",
+    appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
+  };
 
-  <script>
-    /* 🔐 Firebase Ayarları */
-    const firebaseConfig = {
-      apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
-      authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
-      projectId: "kitap-arsivi-8efa5",
-      storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
-      messagingSenderId: "712225906954",
-      appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
-    };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
+  const adminPanel = document.getElementById("adminPanel");
+  const kitapListesi = document.getElementById("kitapListesi");
 
-    /* 👤 ADMIN TANIMI */
-    const ADMIN_EMAIL = "admin@unallar.com";
+  let tumKitaplar = [];
 
-    /* 🔒 GİRİŞ KONTROLÜ */
-    auth.onAuthStateChanged(user => {
-      if (!user) {
-        window.location.href = "login.html";
-        return;
-      }
+  // AUTH KONTROL
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      window.location.href = "index.html";
+      return;
+    }
 
-      if (user.email === ADMIN_EMAIL) {
-        document.getElementById("adminPanel").style.display = "block";
-      }
+    if (user.email === ADMIN_EMAIL) {
+      adminPanel.classList.remove("hidden");
+    }
+
+    kitaplariYukle();
+  });
+
+  // ÇIKIŞ
+  document.getElementById("logoutBtn").onclick = async () => {
+    await signOut(auth);
+    window.location.href = "index.html";
+  };
+
+  // KİTAPLARI YÜKLE
+  async function kitaplariYukle() {
+    kitapListesi.innerHTML = "";
+    tumKitaplar = [];
+
+    const snapshot = await getDocs(collection(db, "kitaplar"));
+    snapshot.forEach(doc => {
+      tumKitaplar.push(doc.data());
     });
 
-    /* 📚 KİTAPLAR */
-    let tumKitaplar = [];
+    listele(tumKitaplar);
+  }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      fetch("https://raw.githubusercontent.com/ugurunal45/kitap-arsivi-unallar/main/data.json")
-        .then(res => {
-          if (!res.ok) throw new Error("Veri alınamadı");
-          return res.json();
-        })
-        .then(data => {
-          tumKitaplar = data.kitaplar;
-          listeyiGoster(tumKitaplar);
-        })
-        .catch(() => {
-          document.getElementById("kitapListesi").innerHTML =
-            "<li>❌ Veriler yüklenemedi</li>";
-        });
+  function listele(liste) {
+    kitapListesi.innerHTML = "";
+    liste.forEach(k => {
+      const li = document.createElement("li");
+      li.textContent = `${k.ad} — ${k.yazar} (ISBN: ${k.isbn})`;
+      kitapListesi.appendChild(li);
     });
+  }
 
-    function listeyiGoster(liste) {
-      const ul = document.getElementById("kitapListesi");
-      ul.innerHTML = "";
-
-      if (liste.length === 0) {
-        ul.innerHTML = "<li>Sonuç bulunamadı</li>";
-        return;
-      }
-
-      liste.forEach(k => {
-        const li = document.createElement("li");
-        li.textContent = `${k.ad} — ${k.yazar} (ISBN: ${k.isbn})`;
-        ul.appendChild(li);
-      });
+  // KİTAP EKLE (SADECE ADMIN)
+  document.getElementById("ekleBtn").onclick = async () => {
+    const user = auth.currentUser;
+    if (!user || user.email !== ADMIN_EMAIL) {
+      alert("Yetkisiz işlem");
+      return;
     }
 
-    function aramaYap() {
-      const q = document.getElementById("arama").value.toLowerCase();
+    const ad = kitapAdi.value.trim();
+    const yazar = document.getElementById("yazar").value.trim();
+    const isbn = document.getElementById("isbn").value.trim();
 
-      const filtreli = tumKitaplar.filter(k =>
-        k.ad.toLowerCase().includes(q) ||
-        k.yazar.toLowerCase().includes(q) ||
-        k.isbn.includes(q)
-      );
-
-      listeyiGoster(filtreli);
+    if (!ad || !yazar || !isbn) {
+      alert("Tüm alanları doldur");
+      return;
     }
 
-    /* ➕ ADMIN KİTAP EKLEME (GEÇİCİ) */
-    function kitapEkle() {
-      const ad = document.getElementById("yeniAd").value;
-      const yazar = document.getElementById("yeniYazar").value;
-      const isbn = document.getElementById("yeniIsbn").value;
+    await addDoc(collection(db, "kitaplar"), { ad, yazar, isbn });
+    kitapAdi.value = yazar.value = isbn.value = "";
+    kitaplariYukle();
+  };
 
-      if (!ad || !yazar || !isbn) {
-        document.getElementById("ekleMesaj").innerText = "❌ Tüm alanları doldur";
-        return;
-      }
-
-      tumKitaplar.push({ ad, yazar, isbn });
-      listeyiGoster(tumKitaplar);
-
-      document.getElementById("ekleMesaj").innerText =
-        "✅ Kitap eklendi (sayfa yenilenirse silinir)";
-    }
-
-    /* 🚪 ÇIKIŞ */
-    function cikisYap() {
-      auth.signOut().then(() => {
-        window.location.href = "login.html";
-      });
-    }
-  </script>
+  // ARAMA
+  document.getElementById("araBtn").onclick = () => {
+    const q = aramaInput.value.toLowerCase();
+    const filtre = tumKitaplar.filter(k =>
+      k.ad.toLowerCase().includes(q) ||
+      k.yazar.toLowerCase().includes(q) ||
+      k.isbn.includes(q)
+    );
+    listele(filtre);
+  };
+</script>
 
 </body>
 </html>
