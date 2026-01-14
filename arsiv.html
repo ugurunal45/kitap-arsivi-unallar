@@ -2,19 +2,56 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Kitap Arşivi | Admin Paneli</title>
+<title>Kitap Arşivi</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body { font-family: Arial, sans-serif; margin:20px; }
+header { display:flex; justify-content:space-between; align-items:center; }
+.box { border:1px solid #ccc; padding:15px; margin:15px 0; }
+input, button { padding:8px; margin-top:5px; }
+ul { padding-left:20px; }
+li { margin-bottom:6px; }
+.hidden { display:none; }
+.delete-btn { color:red; border:1px solid red; background:none; margin-left:10px; }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>📚 Kitap Arşivi</h2>
+  <button id="logoutBtn">Çıkış</button>
+</header>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="box hidden">
+  <h3>➕ Kitap Ekle</h3>
+  <input id="kitapAdi" placeholder="Kitap Adı">
+  <button id="ekleBtn">Ekle</button>
+
+  <hr>
+
+  <h3>📂 CSV ile Toplu Yükleme</h3>
+  <input type="file" id="csvFile" accept=".csv">
+  <button id="csvUploadBtn">CSV Yükle</button>
+  <p id="csvStatus"></p>
+</div>
+
+<div class="box">
+  <input id="aramaInput" placeholder="Kitap ara">
+  <button id="araBtn">Ara</button>
+</div>
+
+<ul id="kitapListesi"></ul>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
-  getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, writeBatch, doc 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { 
-  getAuth, onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } 
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* 🔐 ADMIN AYARI */
-const ADMIN_EMAIL = "admin@unallar.com";
+const ADMIN_EMAIL = "ugurunal@gmail.com";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
@@ -26,160 +63,93 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const auth = getAuth(app);
-const kitapRef = collection(db, "kitaplar");
+const db = getFirestore(app);
 
 let tumKitaplar = [];
-let adminMi = false;
+let isAdmin = false;
 
-/* 🔍 GİRİŞ KONTROLÜ */
+const adminPanel = document.getElementById("adminPanel");
+const kitapListesi = document.getElementById("kitapListesi");
+
 onAuthStateChanged(auth, user => {
-  if (!user) {
-    window.location.href = "index.html"; // index-2.html'in adını index.html yapmayı unutma
-    return;
-  }
-
-  adminMi = user.email === ADMIN_EMAIL;
-  // Sadece admin ise panel görünür
-  document.getElementById("adminPanel").style.display = adminMi ? "block" : "none";
-  kitaplariGetir();
+  if (!user) location.href = "index.html";
+  isAdmin = user.email === ADMIN_EMAIL;
+  if (isAdmin) adminPanel.classList.remove("hidden");
+  kitaplariYukle();
 });
 
-/* 📚 KİTAPLARI LİSTELE VE SAY */
-async function kitaplariGetir() {
-  const sayac = document.getElementById("sayac");
-  const liste = document.getElementById("kitapListesi");
-  
-  liste.innerHTML = "<li>Yükleniyor...</li>";
-  tumKitaplar = [];
+logoutBtn.onclick = async () => {
+  await signOut(auth);
+  location.href = "index.html";
+};
 
-  try {
-    const q = query(kitapRef, orderBy("tarih", "desc"));
-    const snap = await getDocs(q);
-
-    snap.forEach(docSnap => {
-      const d = docSnap.data();
-      tumKitaplar.push({ id: docSnap.id, ...d });
-    });
-
-    sayac.textContent = "Toplam Kitap: " + tumKitaplar.length; // Toplam sayıyı gösterir
-    listele(tumKitaplar);
-  } catch (error) {
-    console.error("Veri çekme hatası:", error);
-    liste.innerHTML = "<li>Veriler yüklenemedi.</li>";
-  }
+async function kitaplariYukle(){
+  kitapListesi.innerHTML="";
+  tumKitaplar=[];
+  const snap = await getDocs(collection(db,"kitaplar"));
+  snap.forEach(d => tumKitaplar.push({id:d.id, ad:d.data().ad}));
+  listele(tumKitaplar);
 }
 
-function listele(arr) {
-  const liste = document.getElementById("kitapListesi");
-  liste.innerHTML = "";
-  arr.forEach(k => {
-    const li = document.createElement("li");
-    li.className = "kitap-item";
-    li.innerHTML = `<strong>${k.ad}</strong> ${k.yazar ? ' - ' + k.yazar : ''}`;
-    liste.appendChild(li);
+function listele(liste){
+  kitapListesi.innerHTML="";
+  liste.forEach(k=>{
+    const li=document.createElement("li");
+    li.textContent=k.ad;
+
+    if(isAdmin){
+      const b=document.createElement("button");
+      b.textContent="Sil";
+      b.className="delete-btn";
+      b.onclick=async()=>{
+        if(confirm(k.ad+" silinsin mi?")){
+          await deleteDoc(doc(db,"kitaplar",k.id));
+          kitaplariYukle();
+        }
+      };
+      li.appendChild(b);
+    }
+    kitapListesi.appendChild(li);
   });
 }
 
-/* 🔍 ARAMA FONKSİYONU */
-window.ara = () => {
-  const q = document.getElementById("arama").value.toLowerCase();
-  const filtreli = tumKitaplar.filter(k => 
-    k.ad.toLowerCase().includes(q) || (k.yazar && k.yazar.toLowerCase().includes(q))
-  );
-  listele(filtreli);
+ekleBtn.onclick = async ()=>{
+  if(!isAdmin) return;
+  const ad = kitapAdi.value.trim();
+  if(!ad) return alert("Kitap adı boş");
+  await addDoc(collection(db,"kitaplar"),{ad});
+  kitapAdi.value="";
+  kitaplariYukle();
 };
 
-/* 📂 CSV TOPLU YÜKLEME (GELİŞTİRİLMİŞ) */
-window.csvYukle = async () => {
-  if (!adminMi) return alert("Yetkiniz yok!");
+araBtn.onclick=()=>{
+  const q=aramaInput.value.toLowerCase();
+  listele(tumKitaplar.filter(k=>k.ad.toLowerCase().includes(q)));
+};
 
-  const fileInput = document.getElementById("csvFile");
-  const file = fileInput.files[0];
-  if (!file) return alert("Lütfen bir CSV dosyası seçin.");
+// CSV YÜKLEME
+csvUploadBtn.onclick = async ()=>{
+  if(!isAdmin) return;
+  const file = csvFile.files[0];
+  if(!file) return alert("CSV seç");
 
   const text = await file.text();
-  const satirlar = text.split("\n").map(s => s.trim()).filter(s => s);
-  
-  // 700+ kitap olduğu için "Batch" (Toplu İşlem) kullanıyoruz
-  const batch = writeBatch(db);
-  let count = 0;
+  const satirlar = text.split("\n").slice(1);
+  const mevcut = new Set(tumKitaplar.map(k=>k.ad.toLowerCase()));
 
-  satirlar.forEach(satir => {
-    // CSV formatı: Kitap Adı, Yazar, ISBN şeklinde olabilir
-    const hucreler = satir.split(","); 
-    const yeniKitap = {
-      ad: hucreler[0] || "İsimsiz Kitap",
-      yazar: hucreler[1] || "Bilinmiyor",
-      isbn: hucreler[2] || "",
-      tarih: serverTimestamp()
-    };
-    
-    const yeniDocRef = doc(kitapRef);
-    batch.set(yeniDocRef, yeniKitap);
-    count++;
-  });
-
-  await batch.commit();
-  alert(count + " kitap başarıyla eklendi!");
-  fileInput.value = "";
-  kitaplariGetir();
+  let eklenen=0;
+  for(const s of satirlar){
+    const ad = s.trim();
+    if(ad && !mevcut.has(ad.toLowerCase())){
+      await addDoc(collection(db,"kitaplar"),{ad});
+      eklenen++;
+    }
+  }
+  csvStatus.textContent = eklenen+" kitap eklendi";
+  kitaplariYukle();
 };
-
-// Fonksiyonu window nesnesine bağlamalıyız ki HTML'den erişilebilsin
-window.kitapEkle = async () => {
-  const ad = document.getElementById("tekKitap").value.trim();
-  if (!ad || !adminMi) return;
-
-  await addDoc(kitapRef, { 
-    ad, 
-    yazar: "Bilinmiyor", 
-    tarih: serverTimestamp() 
-  });
-  document.getElementById("tekKitap").value = "";
-  kitaplariGetir();
-};
-
 </script>
 
-<style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f2f5; color: #333; }
-  .box { max-width:600px; margin:30px auto; background:#fff; padding:25px; border-radius:12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-  h1 { text-align: center; color: #1a73e8; }
-  .sayac { background: #e8f0fe; padding: 10px; border-radius: 8px; text-align:center; font-weight:bold; margin-bottom: 20px; color: #1967d2; }
-  input, button { width:100%; padding:12px; margin:8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-  button { background:#1a73e8; color:white; border:none; cursor:pointer; font-weight: bold; transition: 0.3s; }
-  button:hover { background: #1557b0; }
-  ul { list-style:none; padding:0; max-height:400px; overflow-y:auto; margin-top: 20px; }
-  .kitap-item { padding:12px; border-bottom:1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-  .kitap-item:last-child { border-bottom: none; }
-  #adminPanel { display:none; border: 2px solid #e8f0fe; padding: 15px; border-radius: 8px; margin-top: 20px; background: #fafafa; }
-  h3 { margin-top: 0; font-size: 16px; color: #555; }
-</style>
-</head>
-
-<body>
-<div class="box">
-  <h1>📚 Kitap Arşivi</h1>
-  <div id="sayac" class="sayac">Kitaplar hesaplanıyor...</div>
-
-  <input id="arama" placeholder="Kitap veya yazar ara..." onkeyup="ara()">
-
-  <div id="adminPanel">
-    <h3>➕ Yeni Kitap Ekle</h3>
-    <input id="tekKitap" placeholder="Kitap adı yazın...">
-    <button onclick="kitapEkle()">Tekli Ekle</button>
-
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-
-    <h3>📂 Toplu CSV Yükle</h3>
-    <p style="font-size: 12px; color: #666;">Format: Kitap Adı, Yazar, ISBN</p>
-    <input type="file" id="csvFile" accept=".csv">
-    <button onclick="csvYukle()" style="background: #34a853;">Verileri Sisteme Yükle</button>
-  </div>
-
-  <ul id="kitapListesi"></ul>
-</div>
 </body>
 </html>
