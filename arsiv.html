@@ -1,224 +1,152 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <title>Kitap Arşivi</title>
+<meta charset="UTF-8">
+<title>Kitap Arşivi</title>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      addDoc,
-      getDocs,
-      query,
-      orderBy,
-      serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { 
+  getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  getAuth, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-    // 🔹 Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
-      authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
-      projectId: "kitap-arsivi-8efa5",
-      storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
-      messagingSenderId: "712225906954",
-      appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
-    };
+/* 🔐 ADMIN MAIL */
+const ADMIN_EMAIL = "admin@unallar.com";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+/* Firebase */
+const firebaseConfig = {
+  apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
+  authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
+  projectId: "kitap-arsivi-8efa5",
+  storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
+  messagingSenderId: "712225906954",
+  appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
+};
 
-    // 🔹 DOĞRU koleksiyon
-    const kitapRef = collection(db, "kitap-arsivi");
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const kitapRef = collection(db, "kitap-arsivi");
 
-    let tumKitaplar = [];
+let tumKitaplar = [];
+let adminMi = false;
 
-    // =========================
-    // TEK KİTAP EKLE
-    // =========================
-    window.kitapEkle = async function () {
-      const input = document.getElementById("tekKitap");
-      const ad = input.value.trim();
+/* 🔍 AUTH KONTROL */
+onAuthStateChanged(auth, user => {
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
 
-      if (!ad) {
-        alert("Kitap adı boş olamaz");
-        return;
-      }
+  adminMi = user.email === ADMIN_EMAIL;
 
-      await addDoc(kitapRef, {
-        ad: ad,
-        tarih: serverTimestamp()
-      });
+  document.getElementById("adminPanel").style.display = adminMi ? "block" : "none";
+});
 
-      input.value = "";
-      kitaplariGetir();
-    };
+/* 📚 LİSTELE */
+async function kitaplariGetir() {
+  const liste = document.getElementById("kitapListesi");
+  const sayac = document.getElementById("sayac");
 
-    // =========================
-    // ÇOKLU KİTAP EKLE
-    // =========================
-    window.cokluEkle = async function () {
-      const alan = document.getElementById("cokluAlan");
-      const satirlar = alan.value
-        .split("\n")
-        .map(s => s.trim())
-        .filter(s => s);
+  liste.innerHTML = "";
+  tumKitaplar = [];
 
-      if (satirlar.length === 0) {
-        alert("Eklenecek kitap yok");
-        return;
-      }
+  const q = query(kitapRef, orderBy("ad"));
+  const snap = await getDocs(q);
 
-      for (const kitap of satirlar) {
-        await addDoc(kitapRef, {
-          ad: kitap,
-          tarih: serverTimestamp()
-        });
-      }
+  snap.forEach(doc => {
+    const d = doc.data();
+    const ad = d.ad || d.kitapAdi;
+    if (ad) tumKitaplar.push(ad);
+  });
 
-      alan.value = "";
-      kitaplariGetir();
-      alert(satirlar.length + " kitap eklendi");
-    };
+  sayac.textContent = "Toplam Kitap: " + tumKitaplar.length;
+  listele(tumKitaplar);
+}
 
-    // =========================
-    // KİTAPLARI GETİR
-    // =========================
-    async function kitaplariGetir() {
-      const liste = document.getElementById("kitapListesi");
-      const sayac = document.getElementById("sayac");
+function listele(arr) {
+  const liste = document.getElementById("kitapListesi");
+  liste.innerHTML = "";
+  arr.forEach(a => {
+    const li = document.createElement("li");
+    li.textContent = a;
+    liste.appendChild(li);
+  });
+}
 
-      liste.innerHTML = "";
-      tumKitaplar = [];
+/* 🔍 ARAMA */
+window.ara = () => {
+  const q = document.getElementById("arama").value.toLowerCase();
+  listele(tumKitaplar.filter(k => k.toLowerCase().includes(q)));
+};
 
-      const q = query(kitapRef, orderBy("ad"));
-      const snapshot = await getDocs(q);
+/* ➕ TEK EKLE */
+window.kitapEkle = async () => {
+  if (!adminMi) return;
+  const ad = document.getElementById("tekKitap").value.trim();
+  if (!ad) return;
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
+  await addDoc(kitapRef, { ad, tarih: serverTimestamp() });
+  document.getElementById("tekKitap").value = "";
+  kitaplariGetir();
+};
 
-        // 🔥 ESKİ + YENİ KAYIT UYUMLULUĞU
-        const kitapAdi = data.ad || data.kitapAdi;
+/* 📂 CSV YÜKLE */
+window.csvYukle = async () => {
+  if (!adminMi) return;
 
-        if (kitapAdi) {
-          tumKitaplar.push(kitapAdi);
-        }
-      });
+  const file = document.getElementById("csvFile").files[0];
+  if (!file) return alert("CSV seç");
 
-      sayac.textContent = "Toplam Kitap: " + tumKitaplar.length;
-      listele(tumKitaplar);
-    }
+  const text = await file.text();
+  const satirlar = text.split("\n").map(s => s.trim()).filter(s => s);
 
-    function listele(dizi) {
-      const liste = document.getElementById("kitapListesi");
-      liste.innerHTML = "";
+  for (const kitap of satirlar) {
+    await addDoc(kitapRef, { ad: kitap, tarih: serverTimestamp() });
+  }
 
-      dizi.forEach(ad => {
-        const li = document.createElement("li");
-        li.textContent = ad;
-        liste.appendChild(li);
-      });
-    }
+  alert(satirlar.length + " kitap yüklendi");
+  document.getElementById("csvFile").value = "";
+  kitaplariGetir();
+};
 
-    // =========================
-    // ARAMA
-    // =========================
-    window.ara = function () {
-      const q = document.getElementById("arama").value.toLowerCase();
-      const filtre = tumKitaplar.filter(k =>
-        k.toLowerCase().includes(q)
-      );
-      listele(filtre);
-    };
+window.onload = kitaplariGetir;
+</script>
 
-    window.onload = kitaplariGetir;
-  </script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f2f4f7;
-      margin: 0;
-      padding: 0;
-    }
-
-    .box {
-      max-width: 850px;
-      margin: 30px auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 5px 12px rgba(0,0,0,.1);
-    }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-
-    .sayac {
-      text-align: center;
-      font-weight: bold;
-      margin-bottom: 15px;
-    }
-
-    input, textarea, button {
-      width: 100%;
-      padding: 10px;
-      margin: 6px 0;
-      font-size: 15px;
-    }
-
-    button {
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #0056b3;
-    }
-
-    ul {
-      list-style: none;
-      padding: 0;
-      max-height: 420px;
-      overflow-y: auto;
-      border-top: 1px solid #ddd;
-      margin-top: 10px;
-    }
-
-    li {
-      padding: 7px;
-      border-bottom: 1px solid #eee;
-    }
-
-    li:nth-child(odd) {
-      background: #fafafa;
-    }
-  </style>
+<style>
+body { font-family: Arial; background:#f2f4f7; }
+.box { max-width:900px; margin:30px auto; background:#fff; padding:20px; border-radius:10px; }
+input, button { width:100%; padding:10px; margin:5px 0; }
+button { background:#007bff; color:white; border:none; cursor:pointer; }
+ul { list-style:none; padding:0; max-height:400px; overflow:auto; }
+li { padding:6px; border-bottom:1px solid #eee; }
+#adminPanel { display:none; border-top:2px dashed #ccc; margin-top:15px; padding-top:15px; }
+.sayac { text-align:center; font-weight:bold; }
+</style>
 </head>
 
 <body>
-  <div class="box">
-    <h1>📚 Kitap Arşivi</h1>
+<div class="box">
+  <h1>📚 Kitap Arşivi</h1>
+  <div id="sayac" class="sayac">Toplam Kitap: 0</div>
 
-    <div id="sayac" class="sayac">Toplam Kitap: 0</div>
+  <input id="arama" placeholder="Kitap ara..." onkeyup="ara()">
 
-    <input id="arama" placeholder="Kitap ara..." onkeyup="ara()">
-
-    <h3>➕ Tek Kitap Ekle</h3>
+  <!-- 🔐 ADMIN PANEL -->
+  <div id="adminPanel">
+    <h3>➕ Tek Kitap</h3>
     <input id="tekKitap" placeholder="Kitap adı">
     <button onclick="kitapEkle()">Ekle</button>
 
-    <h3>📦 Çoklu Kitap Ekle (her satır 1 kitap)</h3>
-    <textarea id="cokluAlan" rows="6" placeholder="Kitap 1&#10;Kitap 2&#10;Kitap 3"></textarea>
-    <button onclick="cokluEkle()">Toplu Ekle</button>
-
-    <ul id="kitapListesi"></ul>
+    <h3>📂 CSV ile Toplu Yükleme</h3>
+    <input type="file" id="csvFile" accept=".csv">
+    <button onclick="csvYukle()">CSV Yükle</button>
   </div>
+
+  <ul id="kitapListesi"></ul>
+</div>
 </body>
 </html>
