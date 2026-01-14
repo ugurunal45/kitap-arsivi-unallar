@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Giriş</title>
+</head>
+<body>
+
+<h2>🔐 Giriş Yap</h2>
+
+<input type="email" id="email" placeholder="E-posta"><br><br>
+<input type="password" id="password" placeholder="Şifre"><br><br>
+
+<button onclick="girisYap()">Giriş</button>
+
+<p id="hata" style="color:red;"></p>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
+    authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
+    projectId: "kitap-arsivi-8efa5",
+    storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
+    messagingSenderId: "712225906954",
+    appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  function girisYap() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    auth.signInWithEmailAndPassword(email, password)
+      .then(() => {
+        window.location.href = "arsiv.html";
+      })
+      .catch(() => {
+        document.getElementById("hata").innerText = "E-posta veya şifre hatalı";
+      });
+  }
+</script>
+
+</body>
+</html>
