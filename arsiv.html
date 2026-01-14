@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Kitap Arşivi</title>
+</head>
+<body>
+
+  <h2>Kitap Arşivim</h2>
+
+  <input type="text" id="kitapAdi" placeholder="Kitap adı">
+  <button onclick="kitapEkle()">Ekle</button>
+
+  <br><br>
+
+  <input type="text" id="arama" placeholder="Ara..." onkeyup="aramaYap()">
+
+  <ul id="kitapListesi"></ul>
+
+  <script>
+    let kitaplar = [];
+
+    function kitapEkle() {
+      const ad = document.getElementById("kitapAdi").value;
+      if (ad === "") return;
+
+      kitaplar.push(ad);
+      document.getElementById("kitapAdi").value = "";
+      listeyiGuncelle();
+    }
+
+    function listeyiGuncelle() {
+      const ul = document.getElementById("kitapListesi");
+      ul.innerHTML = "";
+
+      kitaplar.forEach(function(kitap) {
+        const li = document.createElement("li");
+        li.textContent = kitap;
+        ul.appendChild(li);
+      });
+    }
+
+    function aramaYap() {
+      const aranan = document.getElementById("arama").value.toLowerCase();
+      const ul = document.getElementById("kitapListesi");
+      ul.innerHTML = "";
+
+      kitaplar
+        .filter(k => k.toLowerCase().includes(aranan))
+        .forEach(function(kitap) {
+          const li = document.createElement("li");
+          li.textContent = kitap;
+          ul.appendChild(li);
+        });
+    }
+  </script>
+
+</body>
+</html>
