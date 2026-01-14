@@ -11,7 +11,6 @@
   .box { background:#fff; padding:20px; border-radius:10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); max-width: 800px; margin: 0 auto 15px auto; }
   h2, h3 { margin-top:0; color: #2c3e50; }
   
-  /* Sayaç Stili */
   .sayac-box { background: #e8f0fe; color: #1967d2; font-weight: bold; text-align: center; font-size: 1.1em; border: 1px solid #d2e3fc; }
   
   input, button { padding:10px; margin-top:8px; border-radius: 5px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; }
@@ -19,21 +18,20 @@
   button:hover { background: #2980b9; }
   
   #logoutBtn { background: #e74c3c; width: auto; padding: 8px 15px; }
-  #logoutBtn:hover { background: #c0392b; }
-
   .hidden { display:none; }
   
-  /* Liste Stili */
   ul { padding:0; list-style:none; max-width: 800px; margin: 20px auto; }
   li { background: #fff; margin-bottom: 8px; padding: 12px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-  .kitap-metni { font-size: 1.05em; }
   .delete-btn { color:#e74c3c; border:1px solid #e74c3c; background:none; width: auto; margin: 0; padding: 5px 10px; font-size: 0.8em; }
-  .delete-btn:hover { background: #fdf2f2; }
+
+  .admin-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+  .clean-btn { background: #f39c12; }
+  .clean-btn:hover { background: #e67e22; }
 
   @media (min-width: 600px) {
     .flex-row { display: flex; gap: 10px; align-items: flex-end; }
-    .flex-row input { margin-top: 0; }
-    .flex-row button { margin-top: 0; width: auto; }
+    .flex-row input, .flex-row button { margin-top: 0; width: auto; }
+    .flex-row input { flex-grow: 1; }
   }
 </style>
 </head>
@@ -45,32 +43,32 @@
   <button id="logoutBtn">Çıkış Yap</button>
 </header>
 
-<div class="box sayac-box" id="toplamGosterge">
-  Yükleniyor...
-</div>
+<div class="box sayac-box" id="toplamGosterge">Yükleniyor...</div>
 
 <div id="adminPanel" class="box hidden">
-  <h3>➕ Yönetici Paneli</h3>
+  <h3>➕ Yönetici İşlemleri</h3>
   <div class="flex-row">
-    <input id="kitapAdi" placeholder="Yeni kitap adı yazın...">
+    <input id="kitapAdi" placeholder="Yeni kitap adı...">
     <button id="ekleBtn">Tekli Ekle</button>
   </div>
 
   <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
+  <label style="font-size: 12px; color: #666;">CSV Yükle:</label>
   <div class="flex-row">
-    <div style="flex-grow: 1;">
-      <label style="font-size: 12px; color: #666;">CSV Yükle (Her satıra bir kitap):</label>
-      <input type="file" id="csvFile" accept=".csv">
-    </div>
+    <input type="file" id="csvFile" accept=".csv">
     <button id="csvUploadBtn" style="background: #27ae60;">Toplu Yükle</button>
   </div>
-  <p id="csvStatus" style="font-size: 13px; color: #27ae60; margin-top: 10px;"></p>
+
+  <div class="admin-actions">
+    <button id="temizleBtn" class="clean-btn">⚠️ Yinelenenleri Sil</button>
+    <p id="statusMsg" style="font-size: 12px; margin: auto 0;"></p>
+  </div>
 </div>
 
 <div class="box">
   <div class="flex-row">
-    <input id="aramaInput" placeholder="Kitap ismi ile ara...">
+    <input id="aramaInput" placeholder="Kitap ara...">
     <button id="araBtn">Ara</button>
   </div>
 </div>
@@ -80,10 +78,9 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } 
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, writeBatch } 
 from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// Sizin Firebase Bilgileriniz
 const firebaseConfig = {
   apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
   authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
@@ -101,61 +98,30 @@ const ADMIN_EMAIL = "admin@unallar.com";
 let tumKitaplar = [];
 let isAdmin = false;
 
-// Sayfa yüklendiğinde kullanıcı kontrolü
 onAuthStateChanged(auth, user => {
-  if (!user) {
-    location.href = "index.html"; // index-2.html adını index.html yaptıysanız
-  } else {
-    isAdmin = user.email === ADMIN_EMAIL;
-    if (isAdmin) {
-      document.getElementById("adminPanel").classList.remove("hidden");
-    }
-    kitaplariYukle();
-  }
+  if (!user) location.href = "index.html";
+  isAdmin = user?.email === ADMIN_EMAIL;
+  if (isAdmin) document.getElementById("adminPanel").classList.remove("hidden");
+  kitaplariYukle();
 });
 
-// Çıkış İşlemi
-document.getElementById("logoutBtn").onclick = async () => {
-  await signOut(auth);
-  location.href = "index.html";
-};
+logoutBtn.onclick = async () => { await signOut(auth); location.href = "index.html"; };
 
-// Veritabanından kitapları çekme (Koleksiyon: kitaplar)
 async function kitaplariYukle(){
-  const listeEl = document.getElementById("kitapListesi");
-  const sayacEl = document.getElementById("toplamGosterge");
-  
-  listeEl.innerHTML = "<li>Yükleniyor...</li>";
+  const snap = await getDocs(collection(db, "kitaplar"));
   tumKitaplar = [];
-
-  try {
-    const snap = await getDocs(collection(db, "kitaplar"));
-    snap.forEach(d => {
-      tumKitaplar.push({ id: d.id, ad: d.data().ad });
-    });
-
-    // Alfabetik sıralama (A-Z)
-    tumKitaplar.sort((a, b) => a.ad.localeCompare(b.ad));
-
-    sayacEl.textContent = `Toplam Kitap Sayısı: ${tumKitaplar.length}`;
-    listele(tumKitaplar);
-  } catch (err) {
-    console.error(err);
-    listeEl.innerHTML = "<li>Veriler çekilirken hata oluştu.</li>";
-  }
+  snap.forEach(d => tumKitaplar.push({ id: d.id, ad: d.data().ad }));
+  tumKitaplar.sort((a, b) => a.ad.localeCompare(b.ad));
+  document.getElementById("toplamGosterge").textContent = `Toplam Kitap Sayısı: ${tumKitaplar.length}`;
+  listele(tumKitaplar);
 }
 
-// Listeyi ekrana basma (1, 2, 3 şeklinde numaralandırılmış)
 function listele(liste){
   const listeEl = document.getElementById("kitapListesi");
   listeEl.innerHTML = "";
-
-  liste.forEach((k, index) => {
+  liste.forEach((k, i) => {
     const li = document.createElement("li");
-    
-    // Numaralandırma index + 1 ile yapılır
-    li.innerHTML = `<span class="kitap-metni"><strong>${index + 1}.</strong> ${k.ad}</span>`;
-
+    li.innerHTML = `<span><strong>${i + 1}.</strong> ${k.ad}</span>`;
     if(isAdmin){
       const b = document.createElement("button");
       b.textContent = "Sil";
@@ -172,50 +138,66 @@ function listele(liste){
   });
 }
 
-// Tekli Kitap Ekleme
-document.getElementById("ekleBtn").onclick = async () => {
-  const input = document.getElementById("kitapAdi");
-  const ad = input.value.trim();
-  if(!ad || !isAdmin) return;
+// ⚠️ YİNELENENLERİ SİLME FONKSİYONU
+temizleBtn.onclick = async () => {
+  if(!isAdmin || !confirm("Aynı isimdeki fazla kitaplar silinecek. Emin misiniz?")) return;
+  const status = document.getElementById("statusMsg");
+  status.textContent = "Taranıyor...";
   
-  await addDoc(collection(db, "kitaplar"), { ad });
-  input.value = "";
+  const isimHaritasi = {};
+  const silinecekler = [];
+
+  // Tüm kitapları tara
+  tumKitaplar.forEach(k => {
+    const isim = k.ad.trim().toLowerCase();
+    if (isimHaritasi[isim]) {
+      silinecekler.push(k.id); // Zaten varsa bu ID'yi silme listesine ekle
+    } else {
+      isimHaritasi[isim] = true; // İlk kez rastlanıyorsa işaretle
+    }
+  });
+
+  if (silinecekler.length === 0) {
+    status.textContent = "Mükerrer kayıt bulunamadı.";
+    return;
+  }
+
+  status.textContent = `${silinecekler.length} adet kopya siliniyor...`;
+  const batch = writeBatch(db);
+  silinecekler.forEach(id => {
+    batch.delete(doc(db, "kitaplar", id));
+  });
+
+  await batch.commit();
+  status.textContent = "Temizlik tamamlandı!";
   kitaplariYukle();
 };
 
-// Arama İşlemi
-document.getElementById("araBtn").onclick = () => {
-  const q = document.getElementById("aramaInput").value.toLowerCase();
-  const sonuc = tumKitaplar.filter(k => k.ad.toLowerCase().includes(q));
-  listele(sonuc);
+ekleBtn.onclick = async () => {
+  const ad = kitapAdi.value.trim();
+  if(!ad || !isAdmin) return;
+  await addDoc(collection(db, "kitaplar"), { ad });
+  kitapAdi.value = "";
+  kitaplariYukle();
 };
 
-// CSV Toplu Yükleme
-document.getElementById("csvUploadBtn").onclick = async () => {
-  const fileInput = document.getElementById("csvFile");
-  const status = document.getElementById("csvStatus");
-  const file = fileInput.files[0];
+araBtn.onclick = () => {
+  const q = aramaInput.value.toLowerCase();
+  listele(tumKitaplar.filter(k => k.ad.toLowerCase().includes(q)));
+};
+
+csvUploadBtn.onclick = async () => {
+  if(!isAdmin || !csvFile.files[0]) return;
+  const text = await csvFile.files[0].text();
+  const satirlar = text.split("\n").map(s => s.trim()).filter(s => s);
+  const mevcutlar = new Set(tumKitaplar.map(k => k.ad.toLowerCase()));
   
-  if(!file || !isAdmin) return alert("Lütfen bir dosya seçin.");
-
-  const text = await file.text();
-  const satirlar = text.split("\n");
-  const mevcutIsimler = new Set(tumKitaplar.map(k => k.ad.toLowerCase()));
-
-  let eklenen = 0;
-  status.textContent = "Yükleniyor...";
-
-  for(let s of satirlar){
-    const ad = s.trim();
-    // Boş satır değilse ve sistemde yoksa ekle
-    if(ad && !mevcutIsimler.has(ad.toLowerCase())){
+  for(let ad of satirlar){
+    if(!mevcutlar.has(ad.toLowerCase())){
       await addDoc(collection(db, "kitaplar"), { ad });
-      eklenen++;
+      mevcutlar.add(ad.toLowerCase());
     }
   }
-  
-  status.textContent = `İşlem tamam! ${eklenen} yeni kitap eklendi.`;
-  fileInput.value = "";
   kitaplariYukle();
 };
 </script>
