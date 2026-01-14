@@ -31,8 +31,9 @@
     }
 
     button {
-      padding: 6px 12px;
+      padding: 6px 10px;
       cursor: pointer;
+      margin-left: 6px;
     }
 
     ul {
@@ -40,11 +41,17 @@
     }
 
     li {
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .hidden {
       display: none;
+    }
+
+    .delete-btn {
+      color: red;
+      border: 1px solid red;
+      background: none;
     }
   </style>
 </head>
@@ -75,7 +82,14 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { 
+    getFirestore, 
+    collection, 
+    addDoc, 
+    getDocs, 
+    deleteDoc, 
+    doc 
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const ADMIN_EMAIL = "admin@unallar.com";
 
@@ -96,6 +110,7 @@
   const kitapListesi = document.getElementById("kitapListesi");
 
   let tumKitaplar = [];
+  let isAdmin = false;
 
   // GİRİŞ KONTROL
   onAuthStateChanged(auth, (user) => {
@@ -104,7 +119,9 @@
       return;
     }
 
-    if (user.email === ADMIN_EMAIL) {
+    isAdmin = user.email === ADMIN_EMAIL;
+
+    if (isAdmin) {
       adminPanel.classList.remove("hidden");
     }
 
@@ -123,8 +140,8 @@
     tumKitaplar = [];
 
     const snapshot = await getDocs(collection(db, "kitaplar"));
-    snapshot.forEach(doc => {
-      tumKitaplar.push(doc.data());
+    snapshot.forEach(d => {
+      tumKitaplar.push({ id: d.id, ad: d.data().ad });
     });
 
     listele(tumKitaplar);
@@ -132,17 +149,33 @@
 
   function listele(liste) {
     kitapListesi.innerHTML = "";
+
     liste.forEach(k => {
       const li = document.createElement("li");
       li.textContent = k.ad;
+
+      if (isAdmin) {
+        const silBtn = document.createElement("button");
+        silBtn.textContent = "Sil";
+        silBtn.className = "delete-btn";
+
+        silBtn.onclick = async () => {
+          if (confirm(`"${k.ad}" silinsin mi?`)) {
+            await deleteDoc(doc(db, "kitaplar", k.id));
+            kitaplariYukle();
+          }
+        };
+
+        li.appendChild(silBtn);
+      }
+
       kitapListesi.appendChild(li);
     });
   }
 
-  // KİTAP EKLE (SADECE AD)
+  // KİTAP EKLE
   document.getElementById("ekleBtn").onclick = async () => {
-    const user = auth.currentUser;
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!isAdmin) {
       alert("Yetkisiz işlem");
       return;
     }
