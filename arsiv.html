@@ -1,59 +1,42 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <title>Kitap Arşivi</title>
-</head>
-<body>
+<script>
+  let kitaplar = JSON.parse(localStorage.getItem("kitaplar")) || [];
 
-  <h2>Kitap Arşivim</h2>
+  function kitapEkle() {
+    const ad = document.getElementById("kitapAdi").value.trim();
+    if (ad === "") return;
 
-  <input type="text" id="kitapAdi" placeholder="Kitap adı">
-  <button onclick="kitapEkle()">Ekle</button>
+    kitaplar.push(ad);
+    localStorage.setItem("kitaplar", JSON.stringify(kitaplar));
 
-  <br><br>
+    document.getElementById("kitapAdi").value = "";
+    listeyiGuncelle();
+  }
 
-  <input type="text" id="arama" placeholder="Ara..." onkeyup="aramaYap()">
+  function listeyiGuncelle() {
+    const ul = document.getElementById("kitapListesi");
+    ul.innerHTML = "";
 
-  <ul id="kitapListesi"></ul>
+    kitaplar.forEach(function(kitap) {
+      const li = document.createElement("li");
+      li.textContent = kitap;
+      ul.appendChild(li);
+    });
+  }
 
-  <script>
-    let kitaplar = [];
+  function aramaYap() {
+    const aranan = document.getElementById("arama").value.toLowerCase();
+    const ul = document.getElementById("kitapListesi");
+    ul.innerHTML = "";
 
-    function kitapEkle() {
-      const ad = document.getElementById("kitapAdi").value;
-      if (ad === "") return;
-
-      kitaplar.push(ad);
-      document.getElementById("kitapAdi").value = "";
-      listeyiGuncelle();
-    }
-
-    function listeyiGuncelle() {
-      const ul = document.getElementById("kitapListesi");
-      ul.innerHTML = "";
-
-      kitaplar.forEach(function(kitap) {
+    kitaplar
+      .filter(k => k.toLowerCase().includes(aranan))
+      .forEach(function(kitap) {
         const li = document.createElement("li");
         li.textContent = kitap;
         ul.appendChild(li);
       });
-    }
+  }
 
-    function aramaYap() {
-      const aranan = document.getElementById("arama").value.toLowerCase();
-      const ul = document.getElementById("kitapListesi");
-      ul.innerHTML = "";
-
-      kitaplar
-        .filter(k => k.toLowerCase().includes(aranan))
-        .forEach(function(kitap) {
-          const li = document.createElement("li");
-          li.textContent = kitap;
-          ul.appendChild(li);
-        });
-    }
-  </script>
-
-</body>
-</html>
+  // Sayfa açıldığında listeyi yükle
+  listeyiGuncelle();
+</script>
