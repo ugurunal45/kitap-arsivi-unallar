@@ -1,70 +1,45 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <title>Kitap Arşivi</title>
-</head>
-<body>
+<script>
+  const DATA_URL = "https://ugurunal45.github.io/kitap-arsivi-unallar/data.json";
 
-  <h1>ARSIV SAYFASI AÇILDI</h1>
+  let kitaplar = [];
 
-  <h2>Kitap Arşivim</h2>
-
-  <input type="text" id="kitapAdi" placeholder="Kitap adı">
-  <button onclick="kitapEkle()">Ekle</button>
-
-  <br><br>
-
-  <input type="text" id="arama" placeholder="Ara..." onkeyup="aramaYap()">
-
-  <ul id="kitapListesi"></ul>
-
-  <script>
-    let kitaplar = [];
-
-    function kitapEkle() {
-      const ad = document.getElementById("kitapAdi").value;
-      if (ad === "") return;
-
-      kitaplar.push(ad);
-      localStorage.setItem("kitaplar", JSON.stringify(kitaplar));
-
-      document.getElementById("kitapAdi").value = "";
+  async function verileriYukle() {
+    try {
+      const response = await fetch(DATA_URL);
+      const data = await response.json();
+      kitaplar = data.kitaplar;
       listeyiGuncelle();
+    } catch (err) {
+      alert("Veriler yüklenemedi!");
+      console.error(err);
     }
+  }
 
-    function listeyiGuncelle() {
-      const ul = document.getElementById("kitapListesi");
-      ul.innerHTML = "";
+  function listeyiGuncelle() {
+    const ul = document.getElementById("kitapListesi");
+    ul.innerHTML = "";
 
-      kitaplar.forEach(function(kitap) {
+    kitaplar.forEach(kitap => {
+      const li = document.createElement("li");
+      li.textContent = `${kitap.ad} – ${kitap.yazar}`;
+      ul.appendChild(li);
+    });
+  }
+
+  function aramaYap() {
+    const aranan = document.getElementById("arama").value.toLowerCase();
+    const ul = document.getElementById("kitapListesi");
+    ul.innerHTML = "";
+
+    kitaplar
+      .filter(k => k.ad.toLowerCase().includes(aranan))
+      .forEach(kitap => {
         const li = document.createElement("li");
-        li.textContent = kitap;
+        li.textContent = `${kitap.ad} – ${kitap.yazar}`;
         ul.appendChild(li);
       });
-    }
+  }
 
-    function aramaYap() {
-      const aranan = document.getElementById("arama").value.toLowerCase();
-      const ul = document.getElementById("kitapListesi");
-      ul.innerHTML = "";
-
-      kitaplar
-        .filter(k => k.toLowerCase().includes(aranan))
-        .forEach(function(kitap) {
-          const li = document.createElement("li");
-          li.textContent = kitap;
-          ul.appendChild(li);
-        });
-    }
-
-    // Sayfa açıldığında yükle
-    const kayitli = localStorage.getItem("kitaplar");
-    if (kayitli) {
-      kitaplar = JSON.parse(kayitli);
-      listeyiGuncelle();
-    }
-  </script>
-
-</body>
-</html>
+  // Sayfa açılınca verileri çek
+  verileriYukle();
+</script>
