@@ -1,155 +1,164 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Kitap Arşivi</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>Kitap Arşivi</title>
 
-<style>
-body { font-family: Arial, sans-serif; margin:20px; }
-header { display:flex; justify-content:space-between; align-items:center; }
-.box { border:1px solid #ccc; padding:15px; margin:15px 0; }
-input, button { padding:8px; margin-top:5px; }
-ul { padding-left:20px; }
-li { margin-bottom:6px; }
-.hidden { display:none; }
-.delete-btn { color:red; border:1px solid red; background:none; margin-left:10px; }
-</style>
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      query,
+      orderBy,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
+      authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
+      projectId: "kitap-arsivi-8efa5",
+      storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
+      messagingSenderId: "712225906954",
+      appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const kitapRef = collection(db, "kitaplar");
+
+    // Kitap ekleme
+    window.kitapEkle = async function () {
+      const kitapAdi = document.getElementById("kitapAdi").value.trim();
+
+      if (!kitapAdi) {
+        alert("Kitap adı boş olamaz");
+        return;
+      }
+
+      await addDoc(kitapRef, {
+        ad: kitapAdi,
+        tarih: serverTimestamp()
+      });
+
+      document.getElementById("kitapAdi").value = "";
+      kitaplariGetir();
+    };
+
+    // Kitapları listele
+    async function kitaplariGetir() {
+      const liste = document.getElementById("kitapListesi");
+      const sayac = document.getElementById("kitapSayisi");
+
+      liste.innerHTML = "";
+
+      const q = query(kitapRef, orderBy("ad"));
+      const snapshot = await getDocs(q);
+
+      let toplam = 0;
+
+      snapshot.forEach(doc => {
+        toplam++;
+        const li = document.createElement("li");
+        li.textContent = doc.data().ad;
+        liste.appendChild(li);
+      });
+
+      sayac.textContent = `Toplam Kitap: ${toplam}`;
+    }
+
+    window.onload = kitaplariGetir;
+  </script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+
+    .sayac {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .ekle {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 400px;
+      overflow-y: auto;
+      border-top: 1px solid #ddd;
+    }
+
+    li {
+      padding: 8px 6px;
+      border-bottom: 1px solid #eee;
+    }
+
+    li:nth-child(odd) {
+      background: #fafafa;
+    }
+  </style>
 </head>
 
 <body>
+  <div class="container">
+    <h1>📚 Kitap Arşivi</h1>
+    <div id="kitapSayisi" class="sayac">Toplam Kitap: 0</div>
 
-<header>
-  <h2>📚 Kitap Arşivi</h2>
-  <button id="logoutBtn">Çıkış</button>
-</header>
+    <div class="ekle">
+      <input id="kitapAdi" placeholder="Sadece kitap adı yaz" />
+      <button onclick="kitapEkle()">Ekle</button>
+    </div>
 
-<!-- ADMIN PANEL -->
-<div id="adminPanel" class="box hidden">
-  <h3>➕ Kitap Ekle</h3>
-  <input id="kitapAdi" placeholder="Kitap Adı">
-  <button id="ekleBtn">Ekle</button>
-
-  <hr>
-
-  <h3>📂 CSV ile Toplu Yükleme</h3>
-  <input type="file" id="csvFile" accept=".csv">
-  <button id="csvUploadBtn">CSV Yükle</button>
-  <p id="csvStatus"></p>
-</div>
-
-<div class="box">
-  <input id="aramaInput" placeholder="Kitap ara">
-  <button id="araBtn">Ara</button>
-</div>
-
-<ul id="kitapListesi"></ul>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } 
-from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const ADMIN_EMAIL = "admin@unallar.com";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
-  authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
-  projectId: "kitap-arsivi-8efa5",
-  storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
-  messagingSenderId: "712225906954",
-  appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-let tumKitaplar = [];
-let isAdmin = false;
-
-const adminPanel = document.getElementById("adminPanel");
-const kitapListesi = document.getElementById("kitapListesi");
-
-onAuthStateChanged(auth, user => {
-  if (!user) location.href = "index.html";
-  isAdmin = user.email === ADMIN_EMAIL;
-  if (isAdmin) adminPanel.classList.remove("hidden");
-  kitaplariYukle();
-});
-
-logoutBtn.onclick = async () => {
-  await signOut(auth);
-  location.href = "index.html";
-};
-
-async function kitaplariYukle(){
-  kitapListesi.innerHTML="";
-  tumKitaplar=[];
-  const snap = await getDocs(collection(db,"kitaplar"));
-  snap.forEach(d => tumKitaplar.push({id:d.id, ad:d.data().ad}));
-  listele(tumKitaplar);
-}
-
-function listele(liste){
-  kitapListesi.innerHTML="";
-  liste.forEach(k=>{
-    const li=document.createElement("li");
-    li.textContent=k.ad;
-
-    if(isAdmin){
-      const b=document.createElement("button");
-      b.textContent="Sil";
-      b.className="delete-btn";
-      b.onclick=async()=>{
-        if(confirm(k.ad+" silinsin mi?")){
-          await deleteDoc(doc(db,"kitaplar",k.id));
-          kitaplariYukle();
-        }
-      };
-      li.appendChild(b);
-    }
-    kitapListesi.appendChild(li);
-  });
-}
-
-ekleBtn.onclick = async ()=>{
-  if(!isAdmin) return;
-  const ad = kitapAdi.value.trim();
-  if(!ad) return alert("Kitap adı boş");
-  await addDoc(collection(db,"kitaplar"),{ad});
-  kitapAdi.value="";
-  kitaplariYukle();
-};
-
-araBtn.onclick=()=>{
-  const q=aramaInput.value.toLowerCase();
-  listele(tumKitaplar.filter(k=>k.ad.toLowerCase().includes(q)));
-};
-
-// CSV YÜKLEME
-csvUploadBtn.onclick = async ()=>{
-  if(!isAdmin) return;
-  const file = csvFile.files[0];
-  if(!file) return alert("CSV seç");
-
-  const text = await file.text();
-  const satirlar = text.split("\n").slice(1);
-  const mevcut = new Set(tumKitaplar.map(k=>k.ad.toLowerCase()));
-
-  let eklenen=0;
-  for(const s of satirlar){
-    const ad = s.trim();
-    if(ad && !mevcut.has(ad.toLowerCase())){
-      await addDoc(collection(db,"kitaplar"),{ad});
-      eklenen++;
-    }
-  }
-  csvStatus.textContent = eklenen+" kitap eklendi";
-  kitaplariYukle();
-};
-</script>
-
+    <ul id="kitapListesi"></ul>
+  </div>
 </body>
 </html>
