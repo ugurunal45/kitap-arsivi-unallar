@@ -1,0 +1,14 @@
+{
+  "kitaplar": [
+    {
+      "ad": "Tıkır Tıkır İyi Geceler",
+      "yazar": "Bilinmiyor",
+      "isbn": "9786050000001"
+    },
+    {
+      "ad": "Vahşi Robot",
+      "yazar": "Peter Brown",
+      "isbn": "9786050000002"
+    }
+  ]
+}
