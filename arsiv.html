@@ -7,11 +7,12 @@
     try {
       const response = await fetch(DATA_URL);
       const data = await response.json();
-      kitaplar = data.kitaplar;
+
+      kitaplar = data.kitaplar || [];
       listeyiGuncelle();
-    } catch (err) {
-      alert("Veriler yüklenemedi!");
-      console.error(err);
+    } catch (e) {
+      document.body.innerHTML = "<h2>Veri yükleme hatası</h2><pre>" + e + "</pre>";
+      console.error(e);
     }
   }
 
@@ -19,9 +20,9 @@
     const ul = document.getElementById("kitapListesi");
     ul.innerHTML = "";
 
-    kitaplar.forEach(kitap => {
+    kitaplar.forEach(k => {
       const li = document.createElement("li");
-      li.textContent = `${kitap.ad} – ${kitap.yazar}`;
+      li.textContent = `${k.ad} — ${k.yazar} (ISBN: ${k.isbn})`;
       ul.appendChild(li);
     });
   }
@@ -33,13 +34,12 @@
 
     kitaplar
       .filter(k => k.ad.toLowerCase().includes(aranan))
-      .forEach(kitap => {
+      .forEach(k => {
         const li = document.createElement("li");
-        li.textContent = `${kitap.ad} – ${kitap.yazar}`;
+        li.textContent = `${k.ad} — ${k.yazar} (ISBN: ${k.isbn})`;
         ul.appendChild(li);
       });
   }
 
-  // Sayfa açılınca verileri çek
   verileriYukle();
 </script>
