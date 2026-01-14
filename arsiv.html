@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Kitap Arşivi</title>
+
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 700px;
+      max-width: 800px;
       margin: 40px auto;
     }
 
@@ -18,6 +19,7 @@
     button {
       padding: 8px;
       margin-left: 5px;
+      cursor: pointer;
     }
 
     ul {
@@ -26,40 +28,70 @@
     }
 
     li {
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+    }
+
+    .ust {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
   </style>
 </head>
 
 <body>
 
-  <h2>📚 Kitap Arşivi</h2>
+  <div class="ust">
+    <h2>📚 Kitap Arşivi</h2>
+    <button onclick="cikisYap()">Çıkış</button>
+  </div>
 
-  <input type="text" id="arama" placeholder="Kitap adı veya yazar ara">
+  <input type="text" id="arama" placeholder="Kitap adı, yazar veya ISBN ara">
   <button onclick="aramaYap()">Ara</button>
 
-  <!-- 🔴 EKSİK OLAN ELEMAN BURASIYDI -->
   <ul id="kitapListesi"></ul>
 
+  <!-- 🔐 Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
   <script>
+    /* 🔐 Firebase Ayarları */
+    const firebaseConfig = {
+      apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
+      authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
+      projectId: "kitap-arsivi-8efa5",
+      storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
+      messagingSenderId: "712225906954",
+      appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    /* 🔒 GİRİŞ KONTROLÜ */
+    auth.onAuthStateChanged(user => {
+      if (!user) {
+        window.location.href = "login.html";
+      }
+    });
+
+    /* 📚 KİTAP VERİLERİ */
     let tumKitaplar = [];
 
     document.addEventListener("DOMContentLoaded", () => {
       fetch("https://raw.githubusercontent.com/ugurunal45/kitap-arsivi-unallar/main/data.json")
         .then(res => {
-          if (!res.ok) {
-            throw new Error("Veri alınamadı");
-          }
+          if (!res.ok) throw new Error("Veri alınamadı");
           return res.json();
         })
         .then(data => {
           tumKitaplar = data.kitaplar;
           listeyiGoster(tumKitaplar);
         })
-        .catch(err => {
+        .catch(() => {
           document.getElementById("kitapListesi").innerHTML =
             "<li>❌ Veriler yüklenemedi</li>";
-          console.error(err);
         });
     });
 
@@ -89,6 +121,12 @@
       );
 
       listeyiGoster(filtreli);
+    }
+
+    function cikisYap() {
+      auth.signOut().then(() => {
+        window.location.href = "login.html";
+      });
     }
   </script>
 
