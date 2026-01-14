@@ -71,7 +71,10 @@
       const q = query(kitapRef, orderBy("ad"));
       const snap = await getDocs(q);
 
-      snap.forEach(doc => tumKitaplar.push(doc.data().ad));
+      snap.forEach(doc => {
+  const data = doc.data();
+  tumKitaplar.push(data.ad || data.kitapAdi);
+});
 
       sayac.textContent = "Toplam Kitap: " + tumKitaplar.length;
       listele(tumKitaplar);
