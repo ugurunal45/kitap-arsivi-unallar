@@ -1,46 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>ISBN Kitap Bul</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      padding: 40px;
+    }
+    .kutu {
+      background: white;
+      padding: 20px;
+      max-width: 400px;
+      border-radius: 8px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+    #sonuc {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="kutu">
+    <h2>ISBN → Kitap Adı</h2>
+
+    <input id="isbn" placeholder="ISBN gir (978...)">
+    <button id="btn">Ara</button>
+
+    <div id="sonuc"></div>
+  </div>
+
 <script>
-async function kitapBul() {
-  const isbn = document.getElementById("isbnInput").value.trim();
-  const sonuc = document.getElementById("sonuc");
+  // SAYFA YÜKLENDİ Mİ KONTROL
+  console.log("Sayfa yüklendi");
 
-  if (!isbn) {
-    sonuc.innerText = "ISBN girilmedi";
-    return;
-  }
+  document.getElementById("btn").onclick = function () {
+    kitapBul();
+  };
 
-  sonuc.innerText = "Aranıyor...";
+  async function kitapBul() {
+    const isbn = document.getElementById("isbn").value.trim();
+    const sonuc = document.getElementById("sonuc");
 
-  try {
-    // 1️⃣ GOOGLE BOOKS (Türkçe filtreli)
-    const googleUrl =
-      "https://www.googleapis.com/books/v1/volumes?q=isbn:" +
-      isbn +
-      "&langRestrict=tr";
-
-    const gRes = await fetch(googleUrl);
-    const gData = await gRes.json();
-
-    if (gData.items && gData.items.length > 0) {
-      const kitapAdi = gData.items[0].volumeInfo.title;
-      sonuc.innerText = "📖 " + kitapAdi;
+    if (isbn === "") {
+      sonuc.innerText = "ISBN girilmedi";
       return;
     }
 
-    // 2️⃣ OPEN LIBRARY (yedek)
-    const openUrl = "https://openlibrary.org/search.json?isbn=" + isbn;
-    const oRes = await fetch(openUrl);
-    const oData = await oRes.json();
+    sonuc.innerText = "Aranıyor...";
 
-    if (oData.docs && oData.docs.length > 0) {
-      sonuc.innerText = "📖 " + oData.docs[0].title + " (dil belirsiz)";
-      return;
+    try {
+      const url =
+        "https://www.googleapis.com/books/v1/volumes?q=isbn:" +
+        isbn +
+        "&langRestrict=tr";
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.items && data.items.length > 0) {
+        sonuc.innerText = "📖 " + data.items[0].volumeInfo.title;
+      } else {
+        sonuc.innerText = "Kitap bulunamadı (TR)";
+      }
+    } catch (err) {
+      console.error(err);
+      sonuc.innerText = "Bağlantı hatası";
     }
-
-    sonuc.innerText = "Kitap bulunamadı";
-
-  } catch (e) {
-    console.error(e);
-    sonuc.innerText = "Bağlantı hatası";
   }
-}
 </script>
+
+</body>
+</html>
