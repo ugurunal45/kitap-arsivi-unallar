@@ -1,99 +1,46 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <title>ISBN → Kitap Adı</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      padding: 40px;
-    }
-    .box {
-      max-width: 420px;
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 16px;
-    }
-    .sonuc {
-      margin-top: 20px;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body>
-
-  <div class="box">
-    <h2>ISBN → Kitap Adı</h2>
-
-    <input id="isbnInput" type="text" placeholder="ISBN gir (978...)">
-    <button id="araBtn">Kitap Adını Getir</button>
-
-    <div id="sonuc" class="sonuc"></div>
-  </div>
-
 <script>
-document.getElementById("araBtn").addEventListener("click", kitapBul);
-
 async function kitapBul() {
-  const isbnInput = document.getElementById("isbnInput");
-  const sonucDiv = document.getElementById("sonuc");
+  const isbn = document.getElementById("isbnInput").value.trim();
+  const sonuc = document.getElementById("sonuc");
 
-  if (!isbnInput || !sonucDiv) {
-    alert("HTML elemanları bulunamadı");
+  if (!isbn) {
+    sonuc.innerText = "ISBN girilmedi";
     return;
   }
 
-  const isbn = isbnInput.value.trim();
-
-  if (isbn === "") {
-    sonucDiv.innerText = "ISBN girilmedi";
-    return;
-  }
-
-  sonucDiv.innerText = "Aranıyor...";
+  sonuc.innerText = "Aranıyor...";
 
   try {
-    const response = await fetch(
-      "https://openlibrary.org/search.json?isbn=" + isbn
-    );
+    // 1️⃣ GOOGLE BOOKS (Türkçe filtreli)
+    const googleUrl =
+      "https://www.googleapis.com/books/v1/volumes?q=isbn:" +
+      isbn +
+      "&langRestrict=tr";
 
-    const data = await response.json();
+    const gRes = await fetch(googleUrl);
+    const gData = await gRes.json();
 
-    if (!data.docs || data.docs.length === 0) {
-      sonucDiv.innerText = "Kitap bulunamadı";
+    if (gData.items && gData.items.length > 0) {
+      const kitapAdi = gData.items[0].volumeInfo.title;
+      sonuc.innerText = "📖 " + kitapAdi;
       return;
     }
 
-    // Türkçe kayıt varsa onu seç
-    let kitap = null;
-    for (let i = 0; i < data.docs.length; i++) {
-      if (data.docs[i].language && data.docs[i].language.includes("tur")) {
-        kitap = data.docs[i];
-        break;
-      }
+    // 2️⃣ OPEN LIBRARY (yedek)
+    const openUrl = "https://openlibrary.org/search.json?isbn=" + isbn;
+    const oRes = await fetch(openUrl);
+    const oData = await oRes.json();
+
+    if (oData.docs && oData.docs.length > 0) {
+      sonuc.innerText = "📖 " + oData.docs[0].title + " (dil belirsiz)";
+      return;
     }
 
-    // Yoksa ilk kaydı al
-    if (!kitap) {
-      kitap = data.docs[0];
-    }
-
-    sonucDiv.innerText = "📖 " + kitap.title;
+    sonuc.innerText = "Kitap bulunamadı";
 
   } catch (e) {
     console.error(e);
-    sonucDiv.innerText = "Bağlantı hatası";
+    sonuc.innerText = "Bağlantı hatası";
   }
 }
 </script>
-
-</body>
-</html>
