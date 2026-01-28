@@ -1,40 +1,99 @@
-<script>
-async function kitapBul() {
-  const isbn = document.getElementById("isbnInput").value.trim();
-  const sonuc = document.getElementById("sonuc");
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>ISBN → Kitap Adı</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 40px;
+    }
+    .box {
+      max-width: 420px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+    .sonuc {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
 
-  if (!isbn) {
-    sonuc.innerHTML = "ISBN girilmedi";
+  <div class="box">
+    <h2>ISBN → Kitap Adı</h2>
+
+    <input id="isbnInput" type="text" placeholder="ISBN gir (978...)">
+    <button id="araBtn">Kitap Adını Getir</button>
+
+    <div id="sonuc" class="sonuc"></div>
+  </div>
+
+<script>
+document.getElementById("araBtn").addEventListener("click", kitapBul);
+
+async function kitapBul() {
+  const isbnInput = document.getElementById("isbnInput");
+  const sonucDiv = document.getElementById("sonuc");
+
+  if (!isbnInput || !sonucDiv) {
+    alert("HTML elemanları bulunamadı");
     return;
   }
 
-  sonuc.innerHTML = "Aranıyor...";
+  const isbn = isbnInput.value.trim();
+
+  if (isbn === "") {
+    sonucDiv.innerText = "ISBN girilmedi";
+    return;
+  }
+
+  sonucDiv.innerText = "Aranıyor...";
 
   try {
-    const url = `https://openlibrary.org/search.json?isbn=${isbn}`;
-    const response = await fetch(url);
+    const response = await fetch(
+      "https://openlibrary.org/search.json?isbn=" + isbn
+    );
+
     const data = await response.json();
 
     if (!data.docs || data.docs.length === 0) {
-      sonuc.innerHTML = "Kitap bulunamadı";
+      sonucDiv.innerText = "Kitap bulunamadı";
       return;
     }
 
-    // 1️⃣ Türkçe kayıt ara
-    let kitap = data.docs.find(d =>
-      d.language && d.language.includes("tur")
-    );
+    // Türkçe kayıt varsa onu seç
+    let kitap = null;
+    for (let i = 0; i < data.docs.length; i++) {
+      if (data.docs[i].language && data.docs[i].language.includes("tur")) {
+        kitap = data.docs[i];
+        break;
+      }
+    }
 
-    // 2️⃣ Yoksa ilk sonucu al
+    // Yoksa ilk kaydı al
     if (!kitap) {
       kitap = data.docs[0];
     }
 
-    sonuc.innerHTML = "📖 " + kitap.title;
+    sonucDiv.innerText = "📖 " + kitap.title;
 
-  } catch (err) {
-    console.error(err);
-    sonuc.innerHTML = "Bağlantı hatası";
+  } catch (e) {
+    console.error(e);
+    sonucDiv.innerText = "Bağlantı hatası";
   }
 }
 </script>
+
+</body>
+</html>
