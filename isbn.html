@@ -44,27 +44,29 @@
       const isbn = document.getElementById("isbnInput").value.trim();
       const sonuc = document.getElementById("sonuc");
 
-      sonuc.innerHTML = "Aranıyor...";
-
       if (!isbn) {
         sonuc.innerHTML = "ISBN girilmedi";
         return;
       }
 
-      try {
-        const response = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+      sonuc.innerHTML = "Aranıyor...";
 
-        if (!response.ok) {
+      try {
+        const url = `https://openlibrary.org/search.json?isbn=${isbn}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!data.docs || data.docs.length === 0) {
           sonuc.innerHTML = "Kitap bulunamadı";
           return;
         }
 
-        const data = await response.json();
-        sonuc.innerHTML = "📖 " + data.title;
+        const kitapAdi = data.docs[0].title;
+        sonuc.innerHTML = "📖 " + kitapAdi;
 
-      } catch (error) {
-        sonuc.innerHTML = "Hata oluştu";
-        console.error(error);
+      } catch (err) {
+        console.error(err);
+        sonuc.innerHTML = "Bağlantı hatası";
       }
     }
   </script>
