@@ -1,21 +1,26 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <title>ISBN Kitap Bul</title>
+  <meta charset="UTF-8" />
+  <title>ISBN ile Kitap Bul</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f2f2f2;
-      padding: 40px;
-    }
-    .kutu {
-      background: white;
+      background: #f4f6f8;
       padding: 20px;
-      max-width: 400px;
-      border-radius: 8px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+    .container {
+      max-width: 420px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
     }
     input, button {
       width: 100%;
@@ -23,62 +28,101 @@
       margin-top: 10px;
       font-size: 16px;
     }
-    #sonuc {
-      margin-top: 15px;
-      font-weight: bold;
+    button {
+      cursor: pointer;
+    }
+    .result {
+      margin-top: 20px;
+      text-align: center;
+      display: none;
+    }
+    img {
+      max-width: 150px;
+      margin-bottom: 10px;
+    }
+    .error {
+      color: red;
+      text-align: center;
+      margin-top: 10px;
     }
   </style>
 </head>
-
 <body>
 
-  <div class="kutu">
-    <h2>ISBN → Kitap Adı</h2>
+<div class="container">
+  <h2>📚 ISBN ile Kitap Bul</h2>
 
-    <input id="isbn" placeholder="ISBN gir (978...)">
-    <button id="btn">Ara</button>
+  <input
+    type="text"
+    id="isbnInput"
+    placeholder="ISBN numarasını gir"
+  />
 
-    <div id="sonuc"></div>
+  <button onclick="kitapAra()">Ara</button>
+
+  <div class="error" id="error"></div>
+
+  <div class="result" id="result">
+    <img id="kapak" src="" alt="Kapak" />
+    <h3 id="kitapAdi"></h3>
+
+    <button onclick="onayla()">✅ Onayla</button>
   </div>
+</div>
 
 <script>
-  // SAYFA YÜKLENDİ Mİ KONTROL
-  console.log("Sayfa yüklendi");
+async function kitapAra() {
+  const isbn = document.getElementById("isbnInput").value.trim();
+  const error = document.getElementById("error");
+  const result = document.getElementById("result");
 
-  document.getElementById("btn").onclick = function () {
-    kitapBul();
-  };
+  error.textContent = "";
+  result.style.display = "none";
 
-  async function kitapBul() {
-    const isbn = document.getElementById("isbn").value.trim();
-    const sonuc = document.getElementById("sonuc");
+  if (!isbn) {
+    error.textContent = "ISBN girmen gerekiyor";
+    return;
+  }
 
-    if (isbn === "") {
-      sonuc.innerText = "ISBN girilmedi";
+  try {
+    // TÜRKÇE ÖNCELİKLİ ARAMA
+    const url =
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&langRestrict=tr`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) {
+      error.textContent = "Kitap bulunamadı (TR)";
       return;
     }
 
-    sonuc.innerText = "Aranıyor...";
+    const kitap = data.items[0].volumeInfo;
 
-    try {
-      const url =
-        "https://www.googleapis.com/books/v1/volumes?q=isbn:" +
-        isbn +
-        "&langRestrict=tr";
+    document.getElementById("kitapAdi").textContent =
+      kitap.title || "Kitap adı yok";
 
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (data.items && data.items.length > 0) {
-        sonuc.innerText = "📖 " + data.items[0].volumeInfo.title;
-      } else {
-        sonuc.innerText = "Kitap bulunamadı (TR)";
-      }
-    } catch (err) {
-      console.error(err);
-      sonuc.innerText = "Bağlantı hatası";
+    // Kapak varsa
+    if (kitap.imageLinks && kitap.imageLinks.thumbnail) {
+      document.getElementById("kapak").src =
+        kitap.imageLinks.thumbnail;
+    } else {
+      // OpenLibrary yedek kapak
+      document.getElementById("kapak").src =
+        `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
     }
+
+    result.style.display = "block";
+
+  } catch (err) {
+    error.textContent = "Hata oluştu";
+    console.error(err);
   }
+}
+
+function onayla() {
+  alert("Onaylandı ✅ (Bir sonraki adım: raf seçimi)");
+}
 </script>
 
 </body>
