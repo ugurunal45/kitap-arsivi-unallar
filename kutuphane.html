@@ -1,53 +1,18 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kütüphane</title>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f5f5f5;
-  padding: 15px;
-}
-h2 { margin-top: 0; }
-
-input, select, button {
-  width: 100%;
-  padding: 10px;
-  margin: 6px 0;
-  font-size: 16px;
-}
-
-button {
-  background: #2c7be5;
-  color: white;
-  border: none;
-  border-radius: 5px;
-}
-
-#kameraAlan {
-  position: fixed;
-  inset: 0;
-  background: black;
-  display: none;
-  z-index: 9999;
-}
-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.kitap {
-  background: white;
-  padding: 10px;
-  margin-top: 8px;
-  border-radius: 6px;
-  font-size: 15px;
-}
-.hidden { display: none; }
+body { font-family: Arial; background:#f4f4f4; padding:15px }
+input, select, button { width:100%; padding:10px; margin:6px 0 }
+button { background:#2c7be5; color:white; border:none; border-radius:5px }
+.kitap { background:white; padding:10px; margin:6px 0; border-radius:5px }
+#kamera { display:none; position:fixed; inset:0; background:black; z-index:999 }
+video { width:100%; height:100%; object-fit:cover }
+.hidden { display:none }
 </style>
 </head>
 
@@ -55,37 +20,38 @@ video {
 
 <h2>📚 Kütüphane</h2>
 
-<input id="isbn" placeholder="ISBN" />
-<button onclick="kamerayiAc()">📷 Barkod Oku</button>
-
-<input id="kitapAdi" placeholder="Kitap adı" readonly />
-
-<select id="raf">
-  <option value="">Raf seç</option>
-  <option>Raf 1</option>
-  <option>Raf 2</option>
-  <option>Raf 3</option>
-</select>
-
-<button onclick="kitapKaydet()">💾 Kitabı Kaydet</button>
+<div id="adminPanel" class="hidden">
+  <input id="isbn" placeholder="ISBN">
+  <button onclick="kamerayiAc()">📷 Barkod Oku</button>
+  <input id="kitapAdi" placeholder="Kitap adı" readonly>
+  <select id="raf">
+    <option value="">Raf seç</option>
+    <option>Salon</option>
+    <option>Ofis</option>
+    <option>Çocuk Odası</option>
+  </select>
+  <button onclick="kitapKaydet()">💾 Kitabı Kaydet</button>
+</div>
 
 <h3>📖 Kitaplar</h3>
 <div id="liste"></div>
 
-<!-- Kamera -->
-<div id="kameraAlan">
+<div id="kamera">
   <video id="video" autoplay playsinline></video>
   <button onclick="kamerayiKapat()">Kapat</button>
 </div>
 
-<!-- Quagga -->
 <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 
-<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+/* 🔐 ADMIN MAIL */
+const ADMIN_EMAIL = "admin@unallar.com";
+
+/* 🔥 FIREBASE */
 const firebaseConfig = {
   apiKey: "API_KEY",
   authDomain: "PROJECT.firebaseapp.com",
@@ -93,122 +59,74 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
 const kitaplarRef = collection(db, "kitaplar");
 
-let stream;
-let barcodeDetector;
-
-/* ================== KAMERA ================== */
-
-window.kamerayiAc = async function () {
-  document.getElementById("kameraAlan").style.display = "block";
-
-  if ("BarcodeDetector" in window) {
-    barcodeDetector = new BarcodeDetector({ formats: ["ean_13", "ean_8"] });
-    nativeScan();
-  } else {
-    quaggaScan();
+/* 👤 ADMIN KONTROL */
+onAuthStateChanged(auth, user => {
+  if (user && user.email === ADMIN_EMAIL) {
+    document.getElementById("adminPanel").classList.remove("hidden");
   }
-};
+});
 
-async function nativeScan() {
-  const video = document.getElementById("video");
-
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }
-  });
-
+/* 📷 KAMERA */
+let stream;
+window.kamerayiAc = async () => {
+  kamera.style.display = "block";
+  stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:"environment"} });
   video.srcObject = stream;
 
-  const scan = async () => {
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      const codes = await barcodeDetector.detect(video);
-      if (codes.length > 0) {
-        document.getElementById("isbn").value = codes[0].rawValue;
-        kamerayiKapat();
-        isbnAra();
-        return;
-      }
-    }
-    requestAnimationFrame(scan);
-  };
-  scan();
-}
-
-function quaggaScan() {
   Quagga.init({
-    inputStream: {
-      type: "LiveStream",
-      target: document.querySelector("#video"),
-      constraints: { facingMode: "environment" }
-    },
-    decoder: { readers: ["ean_reader", "ean_13_reader"] }
-  }, err => {
-    if (!err) Quagga.start();
-  });
+    inputStream:{ type:"LiveStream", target:video },
+    decoder:{ readers:["ean_reader","ean_13_reader"] }
+  }, err => { if(!err) Quagga.start(); });
 
-  Quagga.onDetected(data => {
-    document.getElementById("isbn").value = data.codeResult.code;
+  Quagga.onDetected(d => {
+    isbn.value = d.codeResult.code;
     kamerayiKapat();
     isbnAra();
   });
-}
-
-window.kamerayiKapat = function () {
-  document.getElementById("kameraAlan").style.display = "none";
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  if (window.Quagga) Quagga.stop();
 };
 
-/* ================== ISBN ARA ================== */
+window.kamerayiKapat = () => {
+  kamera.style.display = "none";
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  Quagga.stop();
+};
 
-window.isbnAra = async function () {
-  const isbn = document.getElementById("isbn").value;
-  if (!isbn) return;
-
+/* 🔎 ISBN → KİTAP ADI */
+async function isbnAra() {
   try {
-    const res = await fetch(`https://isbnsearch.org/isbn/${isbn}`);
-    const html = await res.text();
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const title = doc.querySelector("h1")?.innerText || "Bulunamadı";
-    document.getElementById("kitapAdi").value = title;
+    const r = await fetch(`https://isbnsearch.org/isbn/${isbn.value}`);
+    const t = await r.text();
+    const d = new DOMParser().parseFromString(t,"text/html");
+    kitapAdi.value = d.querySelector("h1")?.innerText || "Bulunamadı";
   } catch {
     alert("Kitap bulunamadı");
   }
-};
+}
 
-/* ================== KAYDET ================== */
-
-window.kitapKaydet = async function () {
-  const isbn = isbn.value;
-  const kitapAdi = document.getElementById("kitapAdi").value;
-  const raf = document.getElementById("raf").value;
-
-  if (!isbn || !kitapAdi || !raf) {
-    alert("Eksik bilgi");
-    return;
-  }
-
-  await addDoc(kitaplarRef, {
-    isbn,
-    kitapAdi,
-    raf,
-    tarih: new Date()
+/* 💾 KAYDET */
+window.kitapKaydet = async () => {
+  if(!isbn.value || !kitapAdi.value || !raf.value) return alert("Eksik bilgi");
+  await addDoc(kitaplarRef,{
+    isbn:isbn.value,
+    kitapAdi:kitapAdi.value,
+    raf:raf.value,
+    tarih:new Date()
   });
-
   alert("Kaydedildi");
   listele();
 };
 
-/* ================== LİSTE ================== */
-
-async function listele() {
-  liste.innerHTML = "";
-  const snap = await getDocs(kitaplarRef);
-  snap.forEach(d => {
-    const k = d.data();
-    liste.innerHTML += `
+/* 📖 LİSTE */
+async function listele(){
+  liste.innerHTML="";
+  const s = await getDocs(kitaplarRef);
+  s.forEach(d=>{
+    const k=d.data();
+    liste.innerHTML+=`
       <div class="kitap">
         <b>${k.kitapAdi}</b><br>
         ISBN: ${k.isbn}<br>
@@ -216,7 +134,6 @@ async function listele() {
       </div>`;
   });
 }
-
 listele();
 </script>
 
