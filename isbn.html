@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>ISBN ile Kitap Ekle</title>
+  <title>Kütüphane – ISBN ile Kitap Ekle</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
@@ -11,158 +11,137 @@
       background: #f4f6f8;
       padding: 20px;
     }
-
-    .box {
-      max-width: 420px;
+    .card {
+      max-width: 500px;
       margin: auto;
-      background: white;
+      background: #fff;
       padding: 20px;
       border-radius: 8px;
       box-shadow: 0 0 10px rgba(0,0,0,.1);
     }
-
     h2 {
       text-align: center;
-      margin-bottom: 20px;
     }
-
-    input, select, button {
+    input, button {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
       font-size: 16px;
     }
-
     button {
       background: #1976d2;
-      color: white;
+      color: #fff;
       border: none;
-      border-radius: 4px;
       cursor: pointer;
     }
-
-    button:hover {
-      background: #125ca1;
+    button:disabled {
+      background: #aaa;
     }
-
-    .info {
-      background: #eef3f7;
-      padding: 10px;
+    .result {
       margin-top: 15px;
-      border-radius: 4px;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .success {
-      color: green;
-      margin-top: 10px;
-      text-align: center;
-    }
-
-    .error {
-      color: red;
-      margin-top: 10px;
-      text-align: center;
+      padding: 10px;
+      background: #eef;
+      border-radius: 5px;
     }
   </style>
 </head>
 <body>
 
-<div class="box">
-  <h2>ISBN ile Kitap Ekle</h2>
+<div class="card">
+  <h2>📚 Kütüphane</h2>
 
-  <input id="isbnInput" placeholder="ISBN gir (barkod okut)" />
-  <button onclick="kitapAra()">Kitabı Bul</button>
+  <input type="text" id="isbn" placeholder="ISBN gir (örn: 9789750738609)">
+  <button onclick="isbnAra()">ISBN Ara</button>
 
-  <div id="kitapPanel" class="info hidden">
-    <strong>Kitap Adı:</strong>
-    <p id="kitapAdi"></p>
+  <div id="sonuc" class="result" style="display:none;"></div>
 
-    <select id="rafSelect">
-      <option value="">Raf Seç</option>
-      <option value="Salon - Raf 1">Salon - Raf 1</option>
-      <option value="Salon - Raf 2">Salon - Raf 2</option>
-      <option value="Çalışma Odası - Raf 1">Çalışma Odası - Raf 1</option>
-      <option value="Çocuk Odası - Raf 1">Çocuk Odası - Raf 1</option>
-    </select>
-
-    <button onclick="kaydet()">Onayla ve Kaydet</button>
-  </div>
-
-  <div id="mesaj"></div>
+  <input type="text" id="raf" placeholder="Raf bilgisi (örn: Salon / A-3)">
+  <button id="kaydetBtn" onclick="kaydet()" disabled>Kitabı Kaydet</button>
 </div>
 
+<!-- Firebase -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
     authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
     projectId: "kitap-arsivi-8efa5",
-    storageBucket: "kitap-arsivi-8efa5.appspot.com",
+    storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
     messagingSenderId: "712225906954",
     appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
   };
 
   const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
   const db = getFirestore(app);
 
-  let bulunanKitapAdi = "";
-  let bulunanISBN = "";
+  let bulunanKitap = null;
+  let aktifKullanici = null;
 
-  window.kitapAra = async function () {
-    const isbn = document.getElementById("isbnInput").value.trim();
-    const mesaj = document.getElementById("mesaj");
-    mesaj.innerHTML = "";
-
-    if (!isbn) {
-      mesaj.innerHTML = "<div class='error'>ISBN girilmedi</div>";
+  // 🔐 Giriş kontrolü
+  onAuthStateChanged(auth, user => {
+    if (!user) {
+      alert("Giriş yapman gerekiyor");
+      window.location.href = "index.html";
       return;
     }
+    aktifKullanici = user;
+  });
+
+  // 🔎 ISBN arama (OpenLibrary)
+  window.isbnAra = async function () {
+    const isbn = document.getElementById("isbn").value.trim();
+    if (!isbn) return alert("ISBN gir");
+
+    const sonucDiv = document.getElementById("sonuc");
+    sonucDiv.style.display = "block";
+    sonucDiv.innerHTML = "Aranıyor...";
 
     try {
       const res = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
       if (!res.ok) throw new Error();
 
       const data = await res.json();
-      bulunanKitapAdi = data.title;
-      bulunanISBN = isbn;
+      bulunanKitap = {
+        isbn: isbn,
+        ad: data.title
+      };
 
-      document.getElementById("kitapAdi").innerText = data.title;
-      document.getElementById("kitapPanel").classList.remove("hidden");
+      sonucDiv.innerHTML = `<b>Bulunan Kitap:</b><br>${data.title}`;
+      document.getElementById("kaydetBtn").disabled = false;
 
     } catch {
-      mesaj.innerHTML = "<div class='error'>Kitap bulunamadı</div>";
+      sonucDiv.innerHTML = "❌ Kitap bulunamadı";
+      document.getElementById("kaydetBtn").disabled = true;
+      bulunanKitap = null;
     }
   };
 
+  // 💾 Firestore’a kaydet
   window.kaydet = async function () {
-    const raf = document.getElementById("rafSelect").value;
-    const mesaj = document.getElementById("mesaj");
+    if (!bulunanKitap) return;
 
-    if (!raf) {
-      mesaj.innerHTML = "<div class='error'>Raf seçmelisin</div>";
-      return;
-    }
+    const raf = document.getElementById("raf").value.trim();
+    if (!raf) return alert("Raf bilgisi gir");
 
     try {
-      await addDoc(collection(db, "kutuphane_fiziksel"), {
-        isbn: bulunanISBN,
-        kitapAdi: bulunanKitapAdi,
+      await addDoc(collection(db, "kutuphane"), {
+        isbn: bulunanKitap.isbn,
+        kitapAdi: bulunanKitap.ad,
         raf: raf,
-        createdAt: serverTimestamp()
+        ekleyen: aktifKullanici.email,
+        tarih: serverTimestamp()
       });
 
-      mesaj.innerHTML = "<div class='success'>Kitap başarıyla eklendi ✔</div>";
-      document.getElementById("isbnInput").value = "";
-      document.getElementById("kitapPanel").classList.add("hidden");
+      alert("✅ Kitap kütüphaneye eklendi");
+      location.reload();
 
-    } catch {
-      mesaj.innerHTML = "<div class='error'>Kayıt sırasında hata oluştu</div>";
+    } catch (err) {
+      alert("❌ Kayıt sırasında hata oluştu");
+      console.error(err);
     }
   };
 </script>
