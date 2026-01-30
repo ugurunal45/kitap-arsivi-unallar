@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Kütüphanem</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#f4f6f8;
+  padding:20px;
+}
+.box{
+  max-width:900px;
+  margin:auto;
+  background:#fff;
+  padding:20px;
+  border-radius:8px;
+}
+h2{text-align:center;}
+.admin-box{
+  background:#eef3ff;
+  padding:15px;
+  border-radius:6px;
+  margin-bottom:20px;
+}
+input,button{
+  padding:10px;
+  width:100%;
+  margin-top:8px;
+  font-size:16px;
+}
+button{
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  cursor:pointer;
+}
+.count{
+  text-align:center;
+  margin:10px 0;
+  color:#555;
+}
+ul{list-style:none;padding:0;}
+li{
+  padding:10px;
+  border-bottom:1px solid #eee;
+}
+.raf{font-size:14px;color:#666;}
+.hidden{display:none;}
+</style>
+</head>
+
+<body>
+<div class="box">
+  <h2>📚 Kütüphanem</h2>
+
+  <!-- ADMIN EKLEME ALANI -->
+  <div id="adminAlan" class="admin-box hidden">
+    <b>➕ Kitap Ekle (Admin)</b>
+    <input id="isbn" placeholder="ISBN">
+    <button onclick="isbnAra()">ISBN Ara</button>
+    <div id="bulunan"></div>
+    <input id="raf" placeholder="Raf bilgisi (örn: Salon / A-2)">
+    <button onclick="kaydet()">Kaydet</button>
+  </div>
+
+  <!-- ARAMA -->
+  <input id="arama" placeholder="Kitap ara..." onkeyup="filtrele()">
+
+  <div class="count" id="sayac">Yükleniyor...</div>
+
+  <!-- LİSTE -->
+  <ul id="liste"></ul>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
+  authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
+  projectId: "kitap-arsivi-8efa5",
+  storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
+  messagingSenderId: "712225906954",
+  appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
+};
+
+const ADMIN_MAIL = "admin@gmail.com"; // 🔴 BURAYA KENDİ ADMIN MAİLİNİ YAZ
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let kitaplar = [];
+let bulunanKitap = null;
+
+/* GİRİŞ + ADMIN KONTROL */
+onAuthStateChanged(auth, user => {
+  if(!user){
+    alert("Giriş yapmalısın");
+    window.location.href="index.html";
+    return;
+  }
+  if(user.email === ADMIN_MAIL){
+    document.getElementById("adminAlan").classList.remove("hidden");
+  }
+});
+
+/* ISBN ARA */
+window.isbnAra = async function(){
+  const isbn = document.getElementById("isbn").value.trim();
+  if(!isbn) return alert("ISBN gir");
+
+  const div = document.getElementById("bulunan");
+  div.innerText="Aranıyor...";
+
+  try{
+    const r = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+    const d = await r.json();
+    bulunanKitap = { isbn, ad:d.title };
+    div.innerHTML = "📖 <b>"+d.title+"</b>";
+  }catch{
+    div.innerText="Kitap bulunamadı";
+    bulunanKitap=null;
+  }
+}
+
+/* KAYDET */
+window.kaydet = async function(){
+  if(!bulunanKitap) return alert("Önce ISBN ara");
+  const raf = document.getElementById("raf").value.trim();
+  if(!raf) return alert("Raf gir");
+
+  await addDoc(collection(db,"kutuphane"),{
+    isbn: bulunanKitap.isbn,
+    kitapAdi: bulunanKitap.ad,
+    raf: raf,
+    tarih: serverTimestamp()
+  });
+
+  alert("Kitap eklendi");
+  location.reload();
+}
+
+/* LİSTE YÜKLE */
+async function yukle(){
+  const q = query(collection(db,"kutuphane"), orderBy("kitapAdi"));
+  const snap = await getDocs(q);
+  kitaplar = [];
+  snap.forEach(d => kitaplar.push(d.data()));
+  document.getElementById("sayac").innerText = "Toplam kitap: "+kitaplar.length;
+  listele(kitaplar);
+}
+
+/* LİSTELE */
+function listele(arr){
+  const ul = document.getElementById("liste");
+  ul.innerHTML="";
+  if(arr.length===0){ ul.innerHTML="<li>Sonuç yok</li>"; return;}
+  arr.forEach(k=>{
+    const li=document.createElement("li");
+    li.innerHTML=`<b>${k.kitapAdi}</b><br><span class="raf">Raf: ${k.raf}</span>`;
+    ul.appendChild(li);
+  });
+}
+
+/* FİLTRE */
+window.filtrele = function(){
+  const t = document.getElementById("arama").value.toLowerCase();
+  listele(kitaplar.filter(k=>k.kitapAdi.toLowerCase().includes(t)));
+}
+
+yukle();
+</script>
+</body>
+</html>
