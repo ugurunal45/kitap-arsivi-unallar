@@ -1,229 +1,224 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Kütüphanem</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kütüphane</title>
 
 <style>
-body{
+body {
   font-family: Arial, sans-serif;
-  background:#f4f6f8;
-  padding:20px;
+  background: #f5f5f5;
+  padding: 15px;
 }
-.box{
-  max-width:900px;
-  margin:auto;
-  background:#fff;
-  padding:20px;
-  border-radius:8px;
+h2 { margin-top: 0; }
+
+input, select, button {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  font-size: 16px;
 }
-h2{text-align:center;}
-.admin-box{
-  background:#eef3ff;
-  padding:15px;
-  border-radius:6px;
-  margin-bottom:20px;
+
+button {
+  background: #2c7be5;
+  color: white;
+  border: none;
+  border-radius: 5px;
 }
-input,button{
-  padding:10px;
-  width:100%;
-  margin-top:8px;
-  font-size:16px;
+
+#kameraAlan {
+  position: fixed;
+  inset: 0;
+  background: black;
+  display: none;
+  z-index: 9999;
 }
-button{
-  background:#1976d2;
-  color:#fff;
-  border:none;
-  cursor:pointer;
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.count{
-  text-align:center;
-  margin:10px 0;
-  color:#555;
+
+.kitap {
+  background: white;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 6px;
+  font-size: 15px;
 }
-ul{list-style:none;padding:0;}
-li{
-  padding:10px;
-  border-bottom:1px solid #eee;
-}
-.raf{font-size:14px;color:#666;}
-.hidden{display:none;}
-#kamera{width:100%;}
+.hidden { display: none; }
 </style>
 </head>
 
 <body>
-<div class="box">
-  <h2>📚 Kütüphanem</h2>
 
-  <!-- ADMIN EKLEME -->
-  <div id="adminAlan" class="admin-box hidden">
-    <b>➕ Kitap Ekle (Admin)</b>
+<h2>📚 Kütüphane</h2>
 
-    <input id="isbn" placeholder="ISBN">
-    <button onclick="isbnAra()">ISBN Ara</button>
+<input id="isbn" placeholder="ISBN" />
+<button onclick="kamerayiAc()">📷 Barkod Oku</button>
 
-    <button onclick="kamerayiAc()">📷 Barkod Okut</button>
+<input id="kitapAdi" placeholder="Kitap adı" readonly />
 
-    <div id="kameraAlan" class="hidden">
-      <div id="kamera"></div>
-      <button onclick="kamerayiKapat()">Kamerayı Kapat</button>
-    </div>
+<select id="raf">
+  <option value="">Raf seç</option>
+  <option>Raf 1</option>
+  <option>Raf 2</option>
+  <option>Raf 3</option>
+</select>
 
-    <div id="bulunan" style="margin-top:8px;"></div>
+<button onclick="kitapKaydet()">💾 Kitabı Kaydet</button>
 
-    <input id="raf" placeholder="Raf (örn: Salon / A-2)">
-    <button onclick="kaydet()">Kaydet</button>
-  </div>
+<h3>📖 Kitaplar</h3>
+<div id="liste"></div>
 
-  <!-- ARAMA -->
-  <input id="arama" placeholder="Kitap ara..." onkeyup="filtrele()">
-
-  <div class="count" id="sayac">Yükleniyor...</div>
-
-  <!-- LİSTE -->
-  <ul id="liste"></ul>
+<!-- Kamera -->
+<div id="kameraAlan">
+  <video id="video" autoplay playsinline></video>
+  <button onclick="kamerayiKapat()">Kapat</button>
 </div>
 
-<!-- Quagga (Barkod) -->
-<script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
+<!-- Quagga -->
+<script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 
+<!-- Firebase -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* 🔴 ADMIN MAİLİNİ BURAYA YAZ */
-const ADMIN_MAIL = "admin@unallar.com";
-
-/* FIREBASE */
 const firebaseConfig = {
-  apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
-  authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
-  projectId: "kitap-arsivi-8efa5",
-  storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
-  messagingSenderId: "712225906954",
-  appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
+  apiKey: "API_KEY",
+  authDomain: "PROJECT.firebaseapp.com",
+  projectId: "PROJECT_ID"
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
+const kitaplarRef = collection(db, "kitaplar");
 
-let kitaplar = [];
-let bulunanKitap = null;
+let stream;
+let barcodeDetector;
 
-/* AUTH + ADMIN */
-onAuthStateChanged(auth, user=>{
-  if(!user){
-    alert("Giriş yapmalısın");
-    window.location.href="index.html";
+/* ================== KAMERA ================== */
+
+window.kamerayiAc = async function () {
+  document.getElementById("kameraAlan").style.display = "block";
+
+  if ("BarcodeDetector" in window) {
+    barcodeDetector = new BarcodeDetector({ formats: ["ean_13", "ean_8"] });
+    nativeScan();
+  } else {
+    quaggaScan();
+  }
+};
+
+async function nativeScan() {
+  const video = document.getElementById("video");
+
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
+
+  video.srcObject = stream;
+
+  const scan = async () => {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const codes = await barcodeDetector.detect(video);
+      if (codes.length > 0) {
+        document.getElementById("isbn").value = codes[0].rawValue;
+        kamerayiKapat();
+        isbnAra();
+        return;
+      }
+    }
+    requestAnimationFrame(scan);
+  };
+  scan();
+}
+
+function quaggaScan() {
+  Quagga.init({
+    inputStream: {
+      type: "LiveStream",
+      target: document.querySelector("#video"),
+      constraints: { facingMode: "environment" }
+    },
+    decoder: { readers: ["ean_reader", "ean_13_reader"] }
+  }, err => {
+    if (!err) Quagga.start();
+  });
+
+  Quagga.onDetected(data => {
+    document.getElementById("isbn").value = data.codeResult.code;
+    kamerayiKapat();
+    isbnAra();
+  });
+}
+
+window.kamerayiKapat = function () {
+  document.getElementById("kameraAlan").style.display = "none";
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (window.Quagga) Quagga.stop();
+};
+
+/* ================== ISBN ARA ================== */
+
+window.isbnAra = async function () {
+  const isbn = document.getElementById("isbn").value;
+  if (!isbn) return;
+
+  try {
+    const res = await fetch(`https://isbnsearch.org/isbn/${isbn}`);
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const title = doc.querySelector("h1")?.innerText || "Bulunamadı";
+    document.getElementById("kitapAdi").value = title;
+  } catch {
+    alert("Kitap bulunamadı");
+  }
+};
+
+/* ================== KAYDET ================== */
+
+window.kitapKaydet = async function () {
+  const isbn = isbn.value;
+  const kitapAdi = document.getElementById("kitapAdi").value;
+  const raf = document.getElementById("raf").value;
+
+  if (!isbn || !kitapAdi || !raf) {
+    alert("Eksik bilgi");
     return;
   }
-  if(user.email === ADMIN_MAIL){
-    document.getElementById("adminAlan").classList.remove("hidden");
-  }
-});
 
-/* ISBN ARA */
-window.isbnAra = async function(){
-  const isbn = document.getElementById("isbn").value.trim();
-  if(!isbn) return alert("ISBN gir");
-
-  const div = document.getElementById("bulunan");
-  div.innerText="Aranıyor...";
-
-  try{
-    const r = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
-    if(!r.ok) throw new Error();
-    const d = await r.json();
-
-    bulunanKitap = { isbn, ad:d.title };
-    div.innerHTML = "📖 <b>"+d.title+"</b>";
-  }catch{
-    div.innerText="❌ Kitap bulunamadı";
-    bulunanKitap=null;
-  }
-};
-
-/* KAYDET */
-window.kaydet = async function(){
-  if(!bulunanKitap) return alert("Önce ISBN ara");
-  const raf = document.getElementById("raf").value.trim();
-  if(!raf) return alert("Raf bilgisi gir");
-
-  await addDoc(collection(db,"kutuphane"),{
-    isbn: bulunanKitap.isbn,
-    kitapAdi: bulunanKitap.ad,
-    raf: raf,
-    tarih: serverTimestamp()
+  await addDoc(kitaplarRef, {
+    isbn,
+    kitapAdi,
+    raf,
+    tarih: new Date()
   });
 
-  alert("✅ Kitap eklendi");
-  location.reload();
+  alert("Kaydedildi");
+  listele();
 };
 
-/* LİSTE YÜKLE */
-async function yukle(){
-  const q = query(collection(db,"kutuphane"), orderBy("kitapAdi"));
-  const snap = await getDocs(q);
-  kitaplar=[];
-  snap.forEach(d=>kitaplar.push(d.data()));
-  document.getElementById("sayac").innerText="Toplam kitap: "+kitaplar.length;
-  listele(kitaplar);
-}
+/* ================== LİSTE ================== */
 
-/* LİSTE */
-function listele(arr){
-  const ul=document.getElementById("liste");
-  ul.innerHTML="";
-  if(arr.length===0){ul.innerHTML="<li>Sonuç yok</li>";return;}
-  arr.forEach(k=>{
-    const li=document.createElement("li");
-    li.innerHTML=`<b>${k.kitapAdi}</b><br><span class="raf">Raf: ${k.raf}</span>`;
-    ul.appendChild(li);
+async function listele() {
+  liste.innerHTML = "";
+  const snap = await getDocs(kitaplarRef);
+  snap.forEach(d => {
+    const k = d.data();
+    liste.innerHTML += `
+      <div class="kitap">
+        <b>${k.kitapAdi}</b><br>
+        ISBN: ${k.isbn}<br>
+        Raf: ${k.raf}
+      </div>`;
   });
 }
 
-/* FİLTRE */
-window.filtrele=function(){
-  const t=document.getElementById("arama").value.toLowerCase();
-  listele(kitaplar.filter(k=>k.kitapAdi.toLowerCase().includes(t)));
-};
-
-/* KAMERA */
-window.kamerayiAc=function(){
-  document.getElementById("kameraAlan").classList.remove("hidden");
-
-  Quagga.init({
-    inputStream:{
-      type:"LiveStream",
-      target:document.querySelector("#kamera"),
-      constraints:{ facingMode:"environment" }
-    },
-    decoder:{ readers:["ean_reader","ean_13_reader"] }
-  },err=>{
-    if(err){ alert("Kamera açılamadı"); return; }
-    Quagga.start();
-  });
-
-  Quagga.onDetected(data=>{
-    const code=data.codeResult.code;
-    if(code && code.length>=12){
-      document.getElementById("isbn").value=code;
-      kamerayiKapat();
-      isbnAra();
-    }
-  });
-};
-
-window.kamerayiKapat=function(){
-  Quagga.stop();
-  document.getElementById("kameraAlan").classList.add("hidden");
-};
-
-yukle();
+listele();
 </script>
+
 </body>
 </html>
