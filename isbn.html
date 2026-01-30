@@ -2,148 +2,42 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Kütüphane – ISBN ile Kitap Ekle</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      padding: 20px;
-    }
-    .card {
-      max-width: 500px;
-      margin: auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,.1);
-    }
-    h2 {
-      text-align: center;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 16px;
-    }
-    button {
-      background: #1976d2;
-      color: #fff;
-      border: none;
-      cursor: pointer;
-    }
-    button:disabled {
-      background: #aaa;
-    }
-    .result {
-      margin-top: 15px;
-      padding: 10px;
-      background: #eef;
-      border-radius: 5px;
-    }
-  </style>
+  <title>ISBN Kitap Bulucu</title>
 </head>
 <body>
 
-<div class="card">
-  <h2>📚 Kütüphane</h2>
+<h2>ISBN ile Kitap Bul</h2>
 
-  <input type="text" id="isbn" placeholder="ISBN gir (örn: 9789750738609)">
-  <button onclick="isbnAra()">ISBN Ara</button>
+<input id="isbn" placeholder="ISBN gir">
+<button onclick="bul()">Bul</button>
 
-  <div id="sonuc" class="result" style="display:none;"></div>
+<p id="sonuc"></p>
 
-  <input type="text" id="raf" placeholder="Raf bilgisi (örn: Salon / A-3)">
-  <button id="kaydetBtn" onclick="kaydet()" disabled>Kitabı Kaydet</button>
-</div>
+<script>
+function bul() {
+  const isbn = document.getElementById("isbn").value.trim();
+  const sonuc = document.getElementById("sonuc");
 
-<!-- Firebase -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  if (!isbn) {
+    sonuc.innerText = "ISBN giriniz";
+    return;
+  }
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
-    authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
-    projectId: "kitap-arsivi-8efa5",
-    storageBucket: "kitap-arsivi-8efa5.firebasestorage.app",
-    messagingSenderId: "712225906954",
-    appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
-  };
+  sonuc.innerText = "Aranıyor...";
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  let bulunanKitap = null;
-  let aktifKullanici = null;
-
-  // 🔐 Giriş kontrolü
-  onAuthStateChanged(auth, user => {
-    if (!user) {
-      alert("Giriş yapman gerekiyor");
-      window.location.href = "index.html";
-      return;
-    }
-    aktifKullanici = user;
-  });
-
-  // 🔎 ISBN arama (OpenLibrary)
-  window.isbnAra = async function () {
-    const isbn = document.getElementById("isbn").value.trim();
-    if (!isbn) return alert("ISBN gir");
-
-    const sonucDiv = document.getElementById("sonuc");
-    sonucDiv.style.display = "block";
-    sonucDiv.innerHTML = "Aranıyor...";
-
-    try {
-      const res = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
-      if (!res.ok) throw new Error();
-
-      const data = await res.json();
-      bulunanKitap = {
-        isbn: isbn,
-        ad: data.title
-      };
-
-      sonucDiv.innerHTML = `<b>Bulunan Kitap:</b><br>${data.title}`;
-      document.getElementById("kaydetBtn").disabled = false;
-
-    } catch {
-      sonucDiv.innerHTML = "❌ Kitap bulunamadı";
-      document.getElementById("kaydetBtn").disabled = true;
-      bulunanKitap = null;
-    }
-  };
-
-  // 💾 Firestore’a kaydet
-  window.kaydet = async function () {
-    if (!bulunanKitap) return;
-
-    const raf = document.getElementById("raf").value.trim();
-    if (!raf) return alert("Raf bilgisi gir");
-
-    try {
-      await addDoc(collection(db, "kutuphane"), {
-        isbn: bulunanKitap.isbn,
-        kitapAdi: bulunanKitap.ad,
-        raf: raf,
-        ekleyen: aktifKullanici.email,
-        tarih: serverTimestamp()
-      });
-
-      alert("✅ Kitap kütüphaneye eklendi");
-      location.reload();
-
-    } catch (err) {
-      alert("❌ Kayıt sırasında hata oluştu");
-      console.error(err);
-    }
-  };
+  fetch("https://openlibrary.org/search.json?isbn=" + isbn)
+    .then(r => r.json())
+    .then(d => {
+      if (d.docs && d.docs.length > 0) {
+        sonuc.innerText = "📘 Kitap Adı: " + d.docs[0].title;
+      } else {
+        sonuc.innerText = "❌ Kitap bulunamadı";
+      }
+    })
+    .catch(() => {
+      sonuc.innerText = "⚠️ Hata oluştu";
+    });
+}
 </script>
 
 </body>
