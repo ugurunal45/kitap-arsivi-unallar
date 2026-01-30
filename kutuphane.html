@@ -49,6 +49,7 @@ li{
 }
 .raf{font-size:14px;color:#666;}
 .hidden{display:none;}
+#kamera{width:100%;}
 </style>
 </head>
 
@@ -56,13 +57,23 @@ li{
 <div class="box">
   <h2>📚 Kütüphanem</h2>
 
-  <!-- ADMIN EKLEME ALANI -->
+  <!-- ADMIN EKLEME -->
   <div id="adminAlan" class="admin-box hidden">
     <b>➕ Kitap Ekle (Admin)</b>
+
     <input id="isbn" placeholder="ISBN">
     <button onclick="isbnAra()">ISBN Ara</button>
-    <div id="bulunan"></div>
-    <input id="raf" placeholder="Raf bilgisi (örn: Salon / A-2)">
+
+    <button onclick="kamerayiAc()">📷 Barkod Okut</button>
+
+    <div id="kameraAlan" class="hidden">
+      <div id="kamera"></div>
+      <button onclick="kamerayiKapat()">Kamerayı Kapat</button>
+    </div>
+
+    <div id="bulunan" style="margin-top:8px;"></div>
+
+    <input id="raf" placeholder="Raf (örn: Salon / A-2)">
     <button onclick="kaydet()">Kaydet</button>
   </div>
 
@@ -75,11 +86,18 @@ li{
   <ul id="liste"></ul>
 </div>
 
+<!-- Quagga (Barkod) -->
+<script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+/* 🔴 ADMIN MAİLİNİ BURAYA YAZ */
+const ADMIN_MAIL = "admin@gmail.com";
+
+/* FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
   authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
@@ -89,8 +107,6 @@ const firebaseConfig = {
   appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
 };
 
-const ADMIN_MAIL = "admin@unallar.com"; // 🔴 BURAYA KENDİ ADMIN MAİLİNİ YAZ
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -98,8 +114,8 @@ const db = getFirestore(app);
 let kitaplar = [];
 let bulunanKitap = null;
 
-/* GİRİŞ + ADMIN KONTROL */
-onAuthStateChanged(auth, user => {
+/* AUTH + ADMIN */
+onAuthStateChanged(auth, user=>{
   if(!user){
     alert("Giriş yapmalısın");
     window.location.href="index.html";
@@ -120,20 +136,22 @@ window.isbnAra = async function(){
 
   try{
     const r = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+    if(!r.ok) throw new Error();
     const d = await r.json();
+
     bulunanKitap = { isbn, ad:d.title };
     div.innerHTML = "📖 <b>"+d.title+"</b>";
   }catch{
-    div.innerText="Kitap bulunamadı";
+    div.innerText="❌ Kitap bulunamadı";
     bulunanKitap=null;
   }
-}
+};
 
 /* KAYDET */
 window.kaydet = async function(){
   if(!bulunanKitap) return alert("Önce ISBN ara");
   const raf = document.getElementById("raf").value.trim();
-  if(!raf) return alert("Raf gir");
+  if(!raf) return alert("Raf bilgisi gir");
 
   await addDoc(collection(db,"kutuphane"),{
     isbn: bulunanKitap.isbn,
@@ -142,25 +160,25 @@ window.kaydet = async function(){
     tarih: serverTimestamp()
   });
 
-  alert("Kitap eklendi");
+  alert("✅ Kitap eklendi");
   location.reload();
-}
+};
 
 /* LİSTE YÜKLE */
 async function yukle(){
   const q = query(collection(db,"kutuphane"), orderBy("kitapAdi"));
   const snap = await getDocs(q);
-  kitaplar = [];
-  snap.forEach(d => kitaplar.push(d.data()));
-  document.getElementById("sayac").innerText = "Toplam kitap: "+kitaplar.length;
+  kitaplar=[];
+  snap.forEach(d=>kitaplar.push(d.data()));
+  document.getElementById("sayac").innerText="Toplam kitap: "+kitaplar.length;
   listele(kitaplar);
 }
 
-/* LİSTELE */
+/* LİSTE */
 function listele(arr){
-  const ul = document.getElementById("liste");
+  const ul=document.getElementById("liste");
   ul.innerHTML="";
-  if(arr.length===0){ ul.innerHTML="<li>Sonuç yok</li>"; return;}
+  if(arr.length===0){ul.innerHTML="<li>Sonuç yok</li>";return;}
   arr.forEach(k=>{
     const li=document.createElement("li");
     li.innerHTML=`<b>${k.kitapAdi}</b><br><span class="raf">Raf: ${k.raf}</span>`;
@@ -169,10 +187,41 @@ function listele(arr){
 }
 
 /* FİLTRE */
-window.filtrele = function(){
-  const t = document.getElementById("arama").value.toLowerCase();
+window.filtrele=function(){
+  const t=document.getElementById("arama").value.toLowerCase();
   listele(kitaplar.filter(k=>k.kitapAdi.toLowerCase().includes(t)));
-}
+};
+
+/* KAMERA */
+window.kamerayiAc=function(){
+  document.getElementById("kameraAlan").classList.remove("hidden");
+
+  Quagga.init({
+    inputStream:{
+      type:"LiveStream",
+      target:document.querySelector("#kamera"),
+      constraints:{ facingMode:"environment" }
+    },
+    decoder:{ readers:["ean_reader","ean_13_reader"] }
+  },err=>{
+    if(err){ alert("Kamera açılamadı"); return; }
+    Quagga.start();
+  });
+
+  Quagga.onDetected(data=>{
+    const code=data.codeResult.code;
+    if(code && code.length>=12){
+      document.getElementById("isbn").value=code;
+      kamerayiKapat();
+      isbnAra();
+    }
+  });
+};
+
+window.kamerayiKapat=function(){
+  Quagga.stop();
+  document.getElementById("kameraAlan").classList.add("hidden");
+};
 
 yukle();
 </script>
