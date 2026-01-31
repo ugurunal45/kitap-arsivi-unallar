@@ -2,84 +2,107 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Kütüphanem</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ev Kütüphanem</title>
 
 <style>
-body{
-  font-family: Arial, sans-serif;
-  background:#f4f6f8;
-  padding:20px;
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+  margin: 0;
+  padding: 20px;
+  background: #f5f5f7;
 }
-.box{
-  max-width:900px;
-  margin:auto;
-  background:#fff;
-  padding:20px;
-  border-radius:8px;
+
+.container {
+  max-width: 900px;
+  margin: auto;
 }
-h2{text-align:center;}
-.admin-box{
-  background:#eef3ff;
-  padding:15px;
-  border-radius:6px;
-  margin-bottom:20px;
+
+h1 {
+  text-align: center;
 }
-input,button{
-  padding:10px;
-  width:100%;
-  margin-top:8px;
-  font-size:16px;
+
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  margin-bottom: 15px;
 }
-button{
-  background:#1976d2;
-  color:#fff;
-  border:none;
-  cursor:pointer;
+
+input, button {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  font-size: 16px;
 }
-.count{
-  text-align:center;
-  margin:10px 0;
-  color:#555;
+
+button {
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 8px;
 }
-ul{list-style:none;padding:0;}
-li{
-  padding:10px;
-  border-bottom:1px solid #eee;
+
+button:hover { opacity: 0.9; }
+
+.book-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
 }
-.raf{font-size:14px;color:#666;}
-.hidden{display:none;}
+
+small { color: gray; }
+
+.admin-info {
+  font-size: 13px;
+  color: #d32f2f;
+}
 </style>
 </head>
 
 <body>
-<div class="box">
-  <h2>📚 Kütüphanem</h2>
 
-  <!-- ADMIN EKLEME ALANI -->
-  <div id="adminAlan" class="admin-box hidden">
-    <b>➕ Kitap Ekle (Admin)</b>
-    <input id="isbn" placeholder="ISBN">
-    <button onclick="isbnAra()">ISBN Ara</button>
-    <div id="bulunan"></div>
-    <input id="raf" placeholder="Raf bilgisi (örn: Salon / A-2)">
-    <button onclick="kaydet()">Kaydet</button>
-  </div>
+<div class="container">
 
-  <!-- ARAMA -->
-  <input id="arama" placeholder="Kitap ara..." onkeyup="filtrele()">
+<h1>📚 Ev Kütüphanem</h1>
 
-  <div class="count" id="sayac">Yükleniyor...</div>
+<div class="card">
+  <p class="admin-info">
+  ✍️ <b>Not:</b> Yeni kitap ekleyebilmek için <b>admin@unallar.com</b> ile giriş yapmış olmalısın.
+  </p>
 
-  <!-- LİSTE -->
-  <ul id="liste"></ul>
+  <input id="emailInput" placeholder="E-posta (admin@unallar.com)">
+  <input id="passwordInput" type="password" placeholder="Şifre">
+
+  <button onclick="login()">🔐 Admin Girişi Yap</button>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+<div class="card">
+  <h3>➕ Yeni Kitap Ekle</h3>
 
+  <input id="isbn" placeholder="ISBN (isteğe bağlı)">
+  <input id="title" placeholder="Kitap Adı (zorunlu)">
+
+  <button onclick="addBook()">📖 Kütüphaneye Ekle</button>
+  <p id="status"></p>
+</div>
+
+<div class="card">
+  <h3>📚 Kütüphane Listesi</h3>
+  <div id="bookList">Yükleniyor...</div>
+</div>
+
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } 
+from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy } 
+from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+// === SENİN KONFİGİN (DEĞİŞTİRİLMEDİ) ===
 const firebaseConfig = {
   apiKey: "AIzaSyCKYXjtL0jAvcxTD09NzsQelA0ipYQFr0s",
   authDomain: "kitap-arsivi-8efa5.firebaseapp.com",
@@ -89,92 +112,81 @@ const firebaseConfig = {
   appId: "1:712225906954:web:b4e317515cefa3d3c89af3"
 };
 
-const ADMIN_MAIL = "admin@unallar.com"; // 🔴 BURAYA KENDİ ADMIN MAİLİNİ YAZ
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let kitaplar = [];
-let bulunanKitap = null;
+window.login = async function() {
+  const email = document.getElementById("emailInput").value;
+  const pass = document.getElementById("passwordInput").value;
 
-/* GİRİŞ + ADMIN KONTROL */
-onAuthStateChanged(auth, user => {
-  if(!user){
-    alert("Giriş yapmalısın");
-    window.location.href="index.html";
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    document.getElementById("status").innerText = "✅ Admin girişi başarılı.";
+  } catch (e) {
+    alert("Giriş hatası: " + e.message);
+  }
+};
+
+window.addBook = async function() {
+  const isbn = document.getElementById("isbn").value.trim();
+  const title = document.getElementById("title").value.trim();
+
+  if (!title) {
+    alert("Lütfen kitap adını yaz!");
     return;
   }
-  if(user.email === ADMIN_MAIL){
-    document.getElementById("adminAlan").classList.remove("hidden");
+
+  const user = auth.currentUser;
+
+  if (!user || user.email !== "admin@unallar.com") {
+    alert("❌ Sadece admin ekleme yapabilir!");
+    return;
   }
-});
 
-/* ISBN ARA */
-window.isbnAra = async function(){
-  const isbn = document.getElementById("isbn").value.trim();
-  if(!isbn) return alert("ISBN gir");
+  try {
+    await addDoc(collection(db, "kutuphane"), {
+      title: title,
+      isbn: isbn || "",
+      createdAt: new Date()
+    });
 
-  const div = document.getElementById("bulunan");
-  div.innerText="Aranıyor...";
+    document.getElementById("status").innerText = "✅ Kitap eklendi!";
+    document.getElementById("title").value = "";
+    document.getElementById("isbn").value = "";
 
-  try{
-    const r = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
-    const d = await r.json();
-    bulunanKitap = { isbn, ad:d.title };
-    div.innerHTML = "📖 <b>"+d.title+"</b>";
-  }catch{
-    div.innerText="Kitap bulunamadı";
-    bulunanKitap=null;
+    loadBooks();
+
+  } catch (e) {
+    alert("Kayıt hatası: " + e.message);
   }
-}
+};
 
-/* KAYDET */
-window.kaydet = async function(){
-  if(!bulunanKitap) return alert("Önce ISBN ara");
-  const raf = document.getElementById("raf").value.trim();
-  if(!raf) return alert("Raf gir");
+async function loadBooks() {
+  const listDiv = document.getElementById("bookList");
+  listDiv.innerHTML = "Yükleniyor...";
 
-  await addDoc(collection(db,"kutuphane"),{
-    isbn: bulunanKitap.isbn,
-    kitapAdi: bulunanKitap.ad,
-    raf: raf,
-    tarih: serverTimestamp()
-  });
-
-  alert("Kitap eklendi");
-  location.reload();
-}
-
-/* LİSTE YÜKLE */
-async function yukle(){
-  const q = query(collection(db,"kutuphane"), orderBy("kitapAdi"));
+  const q = query(collection(db, "kutuphane"), orderBy("createdAt", "desc"));
   const snap = await getDocs(q);
-  kitaplar = [];
-  snap.forEach(d => kitaplar.push(d.data()));
-  document.getElementById("sayac").innerText = "Toplam kitap: "+kitaplar.length;
-  listele(kitaplar);
-}
 
-/* LİSTELE */
-function listele(arr){
-  const ul = document.getElementById("liste");
-  ul.innerHTML="";
-  if(arr.length===0){ ul.innerHTML="<li>Sonuç yok</li>"; return;}
-  arr.forEach(k=>{
-    const li=document.createElement("li");
-    li.innerHTML=`<b>${k.kitapAdi}</b><br><span class="raf">Raf: ${k.raf}</span>`;
-    ul.appendChild(li);
+  let html = "";
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    html += `
+      <div class="book-item">
+        <b>${d.title}</b><br>
+        <small>ISBN: ${d.isbn || "—"}</small>
+      </div>
+    `;
   });
+
+  listDiv.innerHTML = html || "Henüz kitap yok.";
 }
 
-/* FİLTRE */
-window.filtrele = function(){
-  const t = document.getElementById("arama").value.toLowerCase();
-  listele(kitaplar.filter(k=>k.kitapAdi.toLowerCase().includes(t)));
-}
-
-yukle();
+// Sayfa açılınca otomatik listele
+loadBooks();
 </script>
+
 </body>
 </html>
